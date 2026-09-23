@@ -8,7 +8,8 @@ import {
   SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Download, Eye, Github, GripVertical, List, Plus, Printer, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Download, Eye, FileText, Github, GripVertical, List, Plus, Printer, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload } from 'lucide-react'
+import { exportDeskCardsToWord, type WordGuest } from './exportDocx'
 
 type Guest = { id: string; lines: string[] }
 type FontWeight = 400 | 500 | 600 | 700
@@ -45,6 +46,14 @@ const FONT_PRESETS: Array<{ id: Exclude<DeskFontPreset, 'custom'>; name: string;
 function resolveDeskFont(preset: DeskFontPreset | undefined, customFamily: string) {
   if (preset === 'custom' && customFamily) return `"${customFamily}", serif`
   return FONT_PRESETS.find((font) => font.id === (preset ?? 'kai'))?.stack ?? FONT_PRESETS[0].stack
+}
+
+function resolveWordFontName(preset: DeskFontPreset, customFontName: string) {
+  if (preset === 'kai') return '標楷體'
+  if (preset === 'sans') return 'Microsoft JhengHei'
+  if (preset === 'ming') return '新細明體'
+  if (preset === 'serif') return 'Times New Roman'
+  return customFontName.replace(/\.(ttf|otf|woff2?|woff)$/i, '') || '標楷體'
 }
 
 function kaiStroke(weight: FontWeight) {
@@ -445,6 +454,8 @@ type InstallPrompt = Event & { prompt:()=>Promise<void>; userChoice:Promise<{out
 export default function App() {
   const previewRef = useRef<HTMLDivElement>(null)
   const guests = useStore((s) => s.guests)
+  const settings = useStore((s) => s.settings)
+  const customFontName = useStore((s) => s.customFontName)
   const uiTheme = useStore((s) => s.uiTheme)
   const [mobileView, setMobileView] = useState<'edit' | 'preview' | 'settings'>(() =>
     useStore.getState().guests.length ? 'preview' : 'edit'
@@ -458,6 +469,34 @@ export default function App() {
     document.documentElement.dataset.theme = uiTheme
   }, [uiTheme])
 
+  const exportWord = async () => {
+    if (!guests.length) return
+
+    const pageElements = Array.from(document.querySelectorAll<HTMLElement>('.page-grid'))
+    const wordGuests: WordGuest[] = guests.map((guestItem, guestIndex) => {
+      const pageIndex = Math.floor(guestIndex / 2)
+      const faceIndex = guestIndex % 2 === 0 ? 1 : 3
+      const face = pageElements[pageIndex]?.querySelectorAll<HTMLElement>('.face')[faceIndex]
+      const sizesPt = face
+        ? Array.from(face.querySelectorAll<HTMLElement>('.text-line')).map((line) => {
+            const px = Number.parseFloat(getComputedStyle(line).fontSize) || 74
+            return Math.max(8, px * 0.75)
+          })
+        : guestItem.lines.map(() => 56)
+
+      return {
+        lines: guestItem.lines.filter((line) => line.trim()),
+        sizesPt,
+      }
+    })
+
+    await exportDeskCardsToWord({
+      guests: wordGuests,
+      fontName: resolveWordFontName(settings.fontPreset, customFontName),
+      bold: settings.fontWeight >= 600,
+    })
+  }
+
   useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as InstallPrompt) }
     window.addEventListener('beforeinstallprompt', handler)
@@ -465,7 +504,7 @@ export default function App() {
   }, [])
 
   return <div className="studio">
-    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 頭對頭桌牌 · React PWA</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="print" onClick={()=>window.print()}><Printer size={17}/>列印 / PDF</button></div></header>
+    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 頭對頭桌牌 · React PWA</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button disabled={!guests.length} onClick={exportWord}><FileText size={17}/>匯出 Word</button><button className="print" onClick={()=>window.print()}><Printer size={17}/>列印 / PDF</button></div></header>
     <main className={`mobile-view-${mobileView}`}><LeftPanel/><section className="preview" ref={previewRef}><div className="preview-bar"><div><b>列印預覽</b><small>{guests.length} 位 · {Math.ceil(guests.length/2)} 頁</small></div><span>{Math.round(scale*100)}%</span></div><div className="canvas">{!pages.length?<div className="blank"><Sparkles size={26}/><h2>先放幾個名字進來</h2><p>批次貼上或逐張新增。字級、置中、正反面交給它處理。</p></div>:pages.map((pair,i)=><Page key={i} pair={pair} scale={scale}/>)}</div></section><SettingsPanel/></main>
     <nav className="mobile-nav" aria-label="主要功能">
       <button className={mobileView==='edit'?'active':''} onClick={()=>setMobileView('edit')}><List size={20}/><span>編輯</span></button>
