@@ -237,3 +237,22 @@ body{color:var(--text);background:var(--soft)}
 @media(max-width:560px){
   .font-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Font cards preview their own names in the actual font. No sacrificial 永續科 required. */
+.font-option{
+  min-height:52px;
+  justify-content:center;
+  padding:10px 12px;
+  text-align:center
+}
+.font-name-preview{
+  display:block;
+  width:100%;
+  font:inherit;
+  font-size:19px;
+  line-height:1.15;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
