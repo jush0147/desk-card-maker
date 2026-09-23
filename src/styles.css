@@ -83,25 +83,25 @@ body{overflow:hidden}
   --text:#18181b;
 }
 :root[data-theme="ocean"]{
-  --accent:#0369a1;--accent-contrast:#fff;--soft:#f0f9ff;--soft-2:#e0f2fe;--panel:#fff;--border:#bae6fd;--border-strong:#7dd3fc;--muted:#0c4a6e;--muted-2:#38bdf8;--text:#0c4a6e
+  --accent:#202124;--accent-contrast:#fff;--soft:#f7f7f5;--soft-2:#eeeeeb;--panel:#ffffff;--border:#e4e4df;--border-strong:#d5d5cf;--muted:#686868;--muted-2:#9a9a96;--text:#202124
 }
 :root[data-theme="indigo"]{
-  --accent:#4f46e5;--accent-contrast:#fff;--soft:#f5f3ff;--soft-2:#ede9fe;--panel:#fff;--border:#ddd6fe;--border-strong:#c4b5fd;--muted:#5b21b6;--muted-2:#8b5cf6;--text:#312e81
+  --accent:#2c2f33;--accent-contrast:#fff;--soft:#eef0f2;--soft-2:#e2e5e8;--panel:#f8f9fa;--border:#d8dce0;--border-strong:#c7ccd1;--muted:#61666b;--muted-2:#8a9096;--text:#25282b
 }
 :root[data-theme="emerald"]{
-  --accent:#047857;--accent-contrast:#fff;--soft:#ecfdf5;--soft-2:#d1fae5;--panel:#fff;--border:#a7f3d0;--border-strong:#6ee7b7;--muted:#065f46;--muted-2:#10b981;--text:#064e3b
+  --accent:#292827;--accent-contrast:#fff;--soft:#e8e6e1;--soft-2:#ddd9d2;--panel:#f3f1ed;--border:#d2cec6;--border-strong:#beb9b0;--muted:#69645d;--muted-2:#958f87;--text:#292827
 }
 :root[data-theme="rose"]{
-  --accent:#be123c;--accent-contrast:#fff;--soft:#fff1f2;--soft-2:#ffe4e6;--panel:#fff;--border:#fecdd3;--border-strong:#fda4af;--muted:#9f1239;--muted-2:#fb7185;--text:#881337
+  --accent:#f4f4f5;--accent-contrast:#18181b;--soft:#242424;--soft-2:#1e1e1e;--panel:#2b2b2b;--border:#3d3d3d;--border-strong:#505050;--muted:#b7b7b7;--muted-2:#858585;--text:#f2f2f2
 }
 :root[data-theme="amber"]{
-  --accent:#b45309;--accent-contrast:#fff;--soft:#fffbeb;--soft-2:#fef3c7;--panel:#fff;--border:#fde68a;--border-strong:#fcd34d;--muted:#92400e;--muted-2:#f59e0b;--text:#78350f
+  --accent:#cccccc;--accent-contrast:#1e1e1e;--soft:#1e1e1e;--soft-2:#181818;--panel:#252526;--border:#333333;--border-strong:#454545;--muted:#b4b4b4;--muted-2:#858585;--text:#cccccc
 }
 :root[data-theme="violet"]{
-  --accent:#7c3aed;--accent-contrast:#fff;--soft:#f5f3ff;--soft-2:#ede9fe;--panel:#fff;--border:#ddd6fe;--border-strong:#c4b5fd;--muted:#6d28d9;--muted-2:#8b5cf6;--text:#4c1d95
+  --accent:#eeeeee;--accent-contrast:#181818;--soft:#181818;--soft-2:#121212;--panel:#202020;--border:#303030;--border-strong:#424242;--muted:#b6b6b6;--muted-2:#7e7e7e;--text:#eeeeee
 }
 :root[data-theme="midnight"]{
-  --accent:#38bdf8;--accent-contrast:#082f49;--soft:#0f172a;--soft-2:#111827;--panel:#111827;--border:#334155;--border-strong:#475569;--muted:#cbd5e1;--muted-2:#94a3b8;--text:#f8fafc
+  --accent:#f5f5f5;--accent-contrast:#000;--soft:#000;--soft-2:#090909;--panel:#0d0d0d;--border:#222;--border-strong:#343434;--muted:#b8b8b8;--muted-2:#7d7d7d;--text:#f5f5f5
 }
 
 body{color:var(--text);background:var(--soft)}
@@ -259,3 +259,28 @@ body{color:var(--text);background:var(--soft)}
 
 .text-line{font-synthesis:weight}
 .field-note{display:block;margin-top:5px;font-size:9px;line-height:1.45;color:var(--muted)}
+
+/* Warm neutral default: modern productivity-app palette instead of candy colors. */
+:root[data-theme="graphite"]{
+  --accent:#1f1f1d;--accent-contrast:#fff;--soft:#f4f0e8;--soft-2:#e9e4da;--panel:#fbf9f5;--border:#ded8cc;--border-strong:#ccc4b6;--muted:#746f67;--muted-2:#9f988d;--text:#252320
+}
+:root[data-theme="rose"] .a4,
+:root[data-theme="amber"] .a4,
+:root[data-theme="violet"] .a4,
+:root[data-theme="midnight"] .a4{box-shadow:0 14px 44px #0009}
+:root[data-theme="rose"] .bulk textarea,
+:root[data-theme="rose"] .guest-card textarea,
+:root[data-theme="rose"] .field input[type=number],
+:root[data-theme="rose"] .field select,
+:root[data-theme="amber"] .bulk textarea,
+:root[data-theme="amber"] .guest-card textarea,
+:root[data-theme="amber"] .field input[type=number],
+:root[data-theme="amber"] .field select,
+:root[data-theme="violet"] .bulk textarea,
+:root[data-theme="violet"] .guest-card textarea,
+:root[data-theme="violet"] .field input[type=number],
+:root[data-theme="violet"] .field select,
+:root[data-theme="midnight"] .bulk textarea,
+:root[data-theme="midnight"] .guest-card textarea,
+:root[data-theme="midnight"] .field input[type=number],
+:root[data-theme="midnight"] .field select{background:var(--soft);color:var(--text)}
