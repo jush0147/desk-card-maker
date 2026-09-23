@@ -246,26 +246,32 @@
     return face;
   }
 
+  function measureTextBox(lineEl) {
+    const range = document.createRange();
+    range.selectNodeContents(lineEl);
+    const rect = range.getBoundingClientRect();
+    range.detach?.();
+    return rect;
+  }
+
   function fitLine(lineEl, maxWidth, maxHeight) {
-    let low = 1;
+    let low = 8;
     let high = 300;
 
-    // .text-line is a block element, so getBoundingClientRect().width mostly
-    // reports the container width, not the actual rendered text width.
-    // scrollWidth exposes the real no-wrap text width once it would overflow.
+    // Measure the actual glyph box, not the block element's width.
+    // Using the element box or scrollWidth is wrong here because a block
+    // is at least as wide as its container, which made every line collapse
+    // to a ~1px font when fillRatio was below 100%.
     for (let i = 0; i < 16; i++) {
       const mid = (low + high) / 2;
       lineEl.style.fontSize = mid + 'px';
 
-      const rect = lineEl.getBoundingClientRect();
-      const actualWidth = lineEl.scrollWidth;
-      const actualHeight = rect.height;
-
-      if (actualWidth <= maxWidth + 0.5 && actualHeight <= maxHeight + 0.5) low = mid;
+      const textRect = measureTextBox(lineEl);
+      if (textRect.width <= maxWidth + 0.5 && textRect.height <= maxHeight + 0.5) low = mid;
       else high = mid;
     }
 
-    lineEl.style.fontSize = Math.max(1, low * 0.98) + 'px';
+    lineEl.style.fontSize = Math.max(8, low * 0.98) + 'px';
   }
 
   function fitAll() {
