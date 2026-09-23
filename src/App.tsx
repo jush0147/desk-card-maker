@@ -12,6 +12,18 @@ import { Download, Eye, Github, GripVertical, List, Plus, Printer, RotateCcw, Sl
 
 type Guest = { id: string; lines: string[] }
 type FontWeight = 500 | 600 | 700
+type ThemeId = 'graphite' | 'ocean' | 'indigo' | 'emerald' | 'rose' | 'amber' | 'violet' | 'midnight'
+
+const UI_THEMES: Array<{ id: ThemeId; name: string; colors: [string, string, string] }> = [
+  { id: 'graphite', name: 'Graphite', colors: ['#18181b', '#f5f5f4', '#d6d3d1'] },
+  { id: 'ocean', name: 'Ocean', colors: ['#0369a1', '#f0f9ff', '#bae6fd'] },
+  { id: 'indigo', name: 'Indigo', colors: ['#4f46e5', '#f5f3ff', '#c7d2fe'] },
+  { id: 'emerald', name: 'Emerald', colors: ['#047857', '#ecfdf5', '#a7f3d0'] },
+  { id: 'rose', name: 'Rose', colors: ['#be123c', '#fff1f2', '#fecdd3'] },
+  { id: 'amber', name: 'Amber', colors: ['#b45309', '#fffbeb', '#fde68a'] },
+  { id: 'violet', name: 'Violet', colors: ['#7c3aed', '#f5f3ff', '#ddd6fe'] },
+  { id: 'midnight', name: 'Midnight', colors: ['#38bdf8', '#0f172a', '#334155'] },
+]
 type Settings = {
   fillRatio: number
   sidePaddingMm: number
@@ -26,6 +38,8 @@ type State = {
   settings: Settings
   imageUrl: string
   imageName: string
+  uiTheme: ThemeId
+  setUiTheme: (theme: ThemeId) => void
   addGuest: () => void
   removeGuest: (id: string) => void
   updateGuest: (id: string, lines: string[]) => void
@@ -66,6 +80,8 @@ const useStore = create<State>()(
       },
       imageUrl: '',
       imageName: '',
+      uiTheme: 'graphite',
+      setUiTheme: (uiTheme) => set({ uiTheme }),
       addGuest: () => set((s) => ({ guests: [...s.guests, guest()] })),
       removeGuest: (gid) => set((s) => ({ guests: s.guests.filter((g) => g.id !== gid) })),
       updateGuest: (gid, lines) => set((s) => ({ guests: s.guests.map((g) => g.id === gid ? { ...g, lines } : g) })),
@@ -84,7 +100,7 @@ const useStore = create<State>()(
     }),
     {
       name: 'desk-card-studio-v2',
-      partialize: (s) => ({ guests: s.guests, settings: s.settings }),
+      partialize: (s) => ({ guests: s.guests, settings: s.settings, uiTheme: s.uiTheme }),
     },
   ),
 )
@@ -230,12 +246,32 @@ function SettingsPanel() {
   const imageName = useStore((s) => s.imageName)
   const setImage = useStore((s) => s.setImage)
   const clear = useStore((s) => s.clearImage)
+  const uiTheme = useStore((s) => s.uiTheme)
+  const setUiTheme = useStore((s) => s.setUiTheme)
   const choose = (file?: File) => {
     if (!file || !file.type.startsWith('image/')) return
     if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl)
     setImage(URL.createObjectURL(file), file.name)
   }
   return <aside className="right-panel">
+    <div className="setting-card theme-card"><label className="cap">介面配色</label>
+      <div className="theme-grid">
+        {UI_THEMES.map((theme) => <button
+          key={theme.id}
+          type="button"
+          className={`theme-option ${uiTheme === theme.id ? 'active' : ''}`}
+          onClick={() => setUiTheme(theme.id)}
+          aria-pressed={uiTheme === theme.id}
+          title={theme.name}
+        >
+          <span className="theme-swatches" aria-hidden="true">
+            {theme.colors.map((color, index) => <i key={index} style={{ background: color }} />)}
+          </span>
+          <b>{theme.name}</b>
+        </button>)}
+      </div>
+      <small>只改操作介面，A4 列印內容維持黑白。</small>
+    </div>
     <div className="setting-card"><label className="cap">模板</label><b>A4 雙桌牌（實測）</b><div className="chips"><span>A4 直式</span><span>2 位 / 頁</span><span>上倒下正</span></div><small>橫線：{GUIDE_MM.join(' / ')} mm</small></div>
     <div className="setting-card"><label className="cap">文字</label>
       <label className="field"><span>填滿程度 <b>{Math.round(settings.fillRatio*100)}%</b></span><input type="range" min="70" max="94" value={Math.round(settings.fillRatio*100)} onChange={(e) => update({ fillRatio: +e.target.value/100 })}/></label>
@@ -255,6 +291,7 @@ type InstallPrompt = Event & { prompt:()=>Promise<void>; userChoice:Promise<{out
 export default function App() {
   const previewRef = useRef<HTMLDivElement>(null)
   const guests = useStore((s) => s.guests)
+  const uiTheme = useStore((s) => s.uiTheme)
   const [mobileView, setMobileView] = useState<'edit' | 'preview' | 'settings'>(() =>
     useStore.getState().guests.length ? 'preview' : 'edit'
   )
@@ -262,6 +299,10 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null)
   const pages: Array<[Guest|undefined,Guest|undefined]> = []
   for(let i=0;i<guests.length;i+=2) pages.push([guests[i],guests[i+1]])
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = uiTheme
+  }, [uiTheme])
 
   useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as InstallPrompt) }
