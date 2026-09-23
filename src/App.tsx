@@ -515,6 +515,7 @@ export default function App() {
         guests: wordGuests,
         fontName: resolveWordFontName(settings.fontPreset, customFontName),
         bold: settings.fontWeight >= 600,
+        showGuides: settings.showGuides,
       })
 
       setWordState('success')
