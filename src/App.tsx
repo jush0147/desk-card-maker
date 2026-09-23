@@ -48,9 +48,9 @@ function resolveDeskFont(preset: DeskFontPreset | undefined, customFamily: strin
 }
 
 function kaiStroke(weight: FontWeight) {
-  if (weight >= 700) return '0.020em currentColor'
-  if (weight >= 600) return '0.012em currentColor'
-  if (weight >= 500) return '0.006em currentColor'
+  if (weight >= 700) return '0.016em currentColor'
+  if (weight >= 600) return '0.009em currentColor'
+  if (weight >= 500) return '0.004em currentColor'
   return '0 transparent'
 }
 
