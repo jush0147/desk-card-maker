@@ -47,6 +47,13 @@ function resolveDeskFont(preset: DeskFontPreset | undefined, customFamily: strin
   return FONT_PRESETS.find((font) => font.id === (preset ?? 'kai'))?.stack ?? FONT_PRESETS[0].stack
 }
 
+function kaiStroke(weight: FontWeight) {
+  if (weight >= 700) return '0.020em currentColor'
+  if (weight >= 600) return '0.012em currentColor'
+  if (weight >= 500) return '0.006em currentColor'
+  return '0 transparent'
+}
+
 const UI_THEMES: Array<{ id: ThemeId; name: string; colors: [string, string, string] }> = [
   { id: 'graphite', name: 'Graphite', colors: ['#18181b', '#f5f5f4', '#d6d3d1'] },
   { id: 'ocean', name: 'Ocean', colors: ['#0369a1', '#f0f9ff', '#bae6fd'] },
@@ -143,14 +150,19 @@ const useStore = create<State>()(
     }),
     {
       name: 'desk-card-studio-v2',
-      version: 3,
+      version: 4,
       migrate: (persisted) => {
         const previous = persisted as any
+        const previousSettings = previous?.settings ?? {}
         return {
           ...previous,
           settings: {
             fontPreset: 'kai',
-            ...(previous?.settings ?? {}),
+            ...previousSettings,
+            fontWeight:
+              previousSettings.fontPreset === 'kai' && previousSettings.fontWeight === 400
+                ? 600
+                : (previousSettings.fontWeight ?? 600),
           },
         }
       },
@@ -243,12 +255,22 @@ function Face({ guest, inverted = false }: { guest?: Guest; inverted?: boolean }
   const customFontFamily = useStore((s) => s.customFontFamily)
   const lines = guest?.lines.filter((x) => x.trim()) ?? []
   const fontFamily = resolveDeskFont(settings.fontPreset, customFontFamily)
-  const effectiveFontWeight: FontWeight = settings.fontPreset === 'kai' ? 400 : settings.fontWeight
-  useAutoFit(ref, lines, { ...settings, fontWeight: effectiveFontWeight }, fontFamily)
+  const effectiveFontWeight = settings.fontWeight
+  const syntheticKaiStroke = settings.fontPreset === 'kai' ? kaiStroke(effectiveFontWeight) : undefined
+  useAutoFit(ref, lines, settings, fontFamily)
   const image = imageUrl ? <div className="desk-image" style={{ width: `${settings.imageWidthMm}mm` }}><img src={imageUrl} alt="" /></div> : null
   const text = <div ref={ref} className="desk-text" style={{ paddingLeft: `${settings.sidePaddingMm}mm`, paddingRight: `${settings.sidePaddingMm}mm`, fontFamily }}>
     <div data-stack className="text-stack" style={{ gap: `${settings.lineGapMm}mm` }}>
-      {lines.map((line, i) => <div data-line className="text-line" style={{ fontWeight: effectiveFontWeight }} key={`${line}-${i}`}>{line}</div>)}
+      {lines.map((line, i) => <div
+        data-line
+        className="text-line"
+        style={{
+          fontWeight: effectiveFontWeight,
+          WebkitTextStroke: syntheticKaiStroke,
+          paintOrder: settings.fontPreset === 'kai' ? 'stroke fill' : undefined,
+        }}
+        key={`${line}-${i}`}
+      >{line}</div>)}
     </div>
   </div>
   return <section className={`face ${inverted ? 'inverted' : ''}`}>{settings.imageSide === 'left' ? <>{image}{text}</> : <>{text}{image}</>}</section>
@@ -370,7 +392,7 @@ function SettingsPanel() {
           style={{ fontFamily: font.stack }}
           onClick={() => update({
             fontPreset: font.id,
-            fontWeight: font.id === 'kai' ? 400 : (settings.fontWeight === 400 ? 600 : settings.fontWeight),
+            fontWeight: settings.fontWeight === 400 ? 600 : settings.fontWeight,
           })}
         >
           <span className="font-name-preview">{font.name}</span>
@@ -407,7 +429,7 @@ function SettingsPanel() {
     <div className="setting-card"><label className="cap">模板</label><b>A4 雙桌牌（實測）</b><div className="chips"><span>A4 直式</span><span>2 位 / 頁</span><span>上倒下正</span></div><small>橫線：{GUIDE_MM.join(' / ')} mm</small></div>
     <div className="setting-card"><label className="cap">文字</label>
       <label className="field"><span>填滿程度 <b>{Math.round(settings.fillRatio*100)}%</b></span><input type="range" min="70" max="94" value={Math.round(settings.fillRatio*100)} onChange={(e) => update({ fillRatio: +e.target.value/100 })}/></label>
-      <label className="field"><span>字重 {settings.fontPreset === 'kai' && <b>固定 Regular</b>}</span><select disabled={settings.fontPreset === 'kai'} value={settings.fontPreset === 'kai' ? 400 : settings.fontWeight} onChange={(e) => update({ fontWeight: +e.target.value as FontWeight })}><option value="400">400 Regular</option><option value="500">500 Medium</option><option value="600">600 Semibold</option><option value="700">700 Bold</option></select>{settings.fontPreset === 'kai' && <small className="field-note">系統標楷體通常只有單一字重；粗體選項不會真的換一套較粗字型。</small>}</label>
+      <label className="field"><span>字重 {settings.fontPreset === 'kai' && <b>合成粗體</b>}</span><select value={settings.fontWeight} onChange={(e) => update({ fontWeight: +e.target.value as FontWeight })}><option value="400">400 Regular</option><option value="500">500 Medium</option><option value="600">600 Semibold</option><option value="700">700 Bold</option></select>{settings.fontPreset === 'kai' && <small className="field-note">標楷體會用瀏覽器合成粗體，再補極輕微筆畫加粗，讓 500 / 600 / 700 真正看得出差異。</small>}</label>
       <div className="two"><label className="field"><span>左右留白 mm</span><input type="number" min="2" max="20" step=".5" value={settings.sidePaddingMm} onChange={(e)=>update({sidePaddingMm:+e.target.value||5})}/></label><label className="field"><span>行距 mm</span><input type="number" min="0" max="10" step=".2" value={settings.lineGapMm} onChange={(e)=>update({lineGapMm:+e.target.value||0})}/></label></div>
     </div>
     <div className="setting-card"><label className="cap">圖片（選用）</label><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e)=>choose(e.target.files?.[0])}/>
