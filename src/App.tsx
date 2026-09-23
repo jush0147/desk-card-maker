@@ -14,7 +14,7 @@ import { exportDeskCardsToWord, type WordGuest } from './exportDocx'
 type Guest = { id: string; lines: string[] }
 type FontWeight = 400 | 500 | 600 | 700
 type DeskFontPreset = 'kai' | 'sans' | 'ming' | 'serif' | 'custom'
-type ThemeId = 'graphite' | 'ocean' | 'indigo' | 'emerald' | 'rose' | 'amber' | 'violet' | 'midnight'
+type ThemeId = 'system' | 'light' | 'dark'
 
 const FONT_PRESETS: Array<{ id: Exclude<DeskFontPreset, 'custom'>; name: string; description: string; stack: string }> = [
   {
@@ -63,15 +63,10 @@ function kaiStroke(weight: FontWeight) {
   return '0 transparent'
 }
 
-const UI_THEMES: Array<{ id: ThemeId; name: string; colors: [string, string, string] }> = [
-  { id: 'graphite', name: 'Linen', colors: ['#1f1f1d', '#f4f0e8', '#ded8cc'] },
-  { id: 'ocean', name: 'Paper', colors: ['#202124', '#f7f7f5', '#deded9'] },
-  { id: 'indigo', name: 'Mist', colors: ['#2c2f33', '#eef0f2', '#d8dce0'] },
-  { id: 'emerald', name: 'Stone', colors: ['#292827', '#e8e6e1', '#ccc8c1'] },
-  { id: 'rose', name: 'Graphite', colors: ['#f4f4f5', '#292929', '#3a3a3a'] },
-  { id: 'amber', name: 'VS Dark', colors: ['#cccccc', '#1e1e1e', '#333333'] },
-  { id: 'violet', name: 'Carbon', colors: ['#eeeeee', '#181818', '#2a2a2a'] },
-  { id: 'midnight', name: 'OLED Black', colors: ['#f5f5f5', '#000000', '#1a1a1a'] },
+const UI_THEMES: Array<{ id: ThemeId; name: string }> = [
+  { id: 'system', name: '系統' },
+  { id: 'light', name: '淺色' },
+  { id: 'dark', name: '深色' },
 ]
 type Settings = {
   fillRatio: number
@@ -135,7 +130,7 @@ const useStore = create<State>()(
       },
       imageUrl: '',
       imageName: '',
-      uiTheme: 'graphite',
+      uiTheme: 'system',
       customFontFamily: '',
       customFontName: '',
       setUiTheme: (uiTheme) => set({ uiTheme }),
@@ -159,12 +154,23 @@ const useStore = create<State>()(
     }),
     {
       name: 'desk-card-studio-v2',
-      version: 4,
+      version: 5,
       migrate: (persisted) => {
         const previous = persisted as any
         const previousSettings = previous?.settings ?? {}
+        const previousTheme = previous?.uiTheme
+        const uiTheme: ThemeId =
+          previousTheme === 'system' || previousTheme === 'light' || previousTheme === 'dark'
+            ? previousTheme
+            : ['rose', 'amber', 'violet', 'midnight'].includes(previousTheme)
+              ? 'dark'
+              : previousTheme
+                ? 'light'
+                : 'system'
+
         return {
           ...previous,
+          uiTheme,
           settings: {
             fontPreset: 'kai',
             ...previousSettings,
@@ -374,23 +380,19 @@ function SettingsPanel() {
     setImage(URL.createObjectURL(file), file.name)
   }
   return <aside className="right-panel">
-    <div className="setting-card theme-card"><label className="cap">介面配色</label>
-      <div className="theme-grid">
+    <div className="setting-card theme-card"><label className="cap">外觀</label>
+      <div className="appearance-control">
         {UI_THEMES.map((theme) => <button
           key={theme.id}
           type="button"
-          className={`theme-option ${uiTheme === theme.id ? 'active' : ''}`}
+          className={uiTheme === theme.id ? 'active' : ''}
           onClick={() => setUiTheme(theme.id)}
           aria-pressed={uiTheme === theme.id}
-          title={theme.name}
         >
-          <span className="theme-swatches" aria-hidden="true">
-            {theme.colors.map((color, index) => <i key={index} style={{ background: color }} />)}
-          </span>
-          <b>{theme.name}</b>
+          {theme.name}
         </button>)}
       </div>
-      <small>只改操作介面，A4 列印內容維持黑白。</small>
+      <small>系統模式會跟著裝置切換；A4 列印內容永遠維持白底黑字。</small>
     </div>
     <div className="setting-card font-card"><label className="cap">桌牌字型</label>
       <div className="font-grid">
@@ -466,7 +468,20 @@ export default function App() {
   for(let i=0;i<guests.length;i+=2) pages.push([guests[i],guests[i+1]])
 
   useEffect(() => {
-    document.documentElement.dataset.theme = uiTheme
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const applyTheme = () => {
+      const resolved = uiTheme === 'system'
+        ? (media.matches ? 'dark' : 'light')
+        : uiTheme
+      document.documentElement.dataset.theme = resolved
+      document.documentElement.style.colorScheme = resolved
+    }
+
+    applyTheme()
+    if (uiTheme !== 'system') return
+
+    media.addEventListener('change', applyTheme)
+    return () => media.removeEventListener('change', applyTheme)
   }, [uiTheme])
 
   const exportWord = async () => {
