@@ -346,3 +346,27 @@ body{color:var(--text);background:var(--soft)}
     height:auto!important
   }
 }
+
+
+.word-toast{
+  position:fixed;
+  left:50%;
+  bottom:calc(74px + env(safe-area-inset-bottom));
+  z-index:100;
+  transform:translateX(-50%);
+  max-width:min(90vw,520px);
+  padding:10px 14px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--panel);
+  color:var(--text);
+  box-shadow:0 10px 30px #0003;
+  font-size:12px;
+  font-weight:700;
+  text-align:center
+}
+.word-toast.error{border-color:#ef4444;color:#b91c1c}
+:root[data-theme="dark"] .word-toast.error{color:#fecaca}
+@media(min-width:1101px){
+  .word-toast{bottom:24px}
+}
