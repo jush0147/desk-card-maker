@@ -8,7 +8,7 @@ import {
   SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Download, Github, GripVertical, Plus, Printer, RotateCcw, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Download, Eye, Github, GripVertical, List, Plus, Printer, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload } from 'lucide-react'
 
 type Guest = { id: string; lines: string[] }
 type FontWeight = 500 | 600 | 700
@@ -95,7 +95,7 @@ function parseBlocks(raw: string) {
   return text.split(/\n\s*\n+/).map((b) => b.split('\n').map((x) => x.trim()).filter(Boolean)).filter((x) => x.length)
 }
 
-function useScale(ref: React.RefObject<HTMLDivElement | null>) {
+function useScale(ref: React.RefObject<HTMLDivElement | null>, refreshKey: string) {
   const [scale, setScale] = useState(.72)
   useEffect(() => {
     const node = ref.current
@@ -105,7 +105,7 @@ function useScale(ref: React.RefObject<HTMLDivElement | null>) {
     const ro = new ResizeObserver(update)
     ro.observe(node)
     return () => ro.disconnect()
-  }, [ref])
+  }, [ref, refreshKey])
   return scale
 }
 
@@ -254,8 +254,11 @@ type InstallPrompt = Event & { prompt:()=>Promise<void>; userChoice:Promise<{out
 
 export default function App() {
   const previewRef = useRef<HTMLDivElement>(null)
-  const scale = useScale(previewRef)
   const guests = useStore((s) => s.guests)
+  const [mobileView, setMobileView] = useState<'edit' | 'preview' | 'settings'>(() =>
+    useStore.getState().guests.length ? 'preview' : 'edit'
+  )
+  const scale = useScale(previewRef, mobileView)
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null)
   const pages: Array<[Guest|undefined,Guest|undefined]> = []
   for(let i=0;i<guests.length;i+=2) pages.push([guests[i],guests[i+1]])
@@ -268,6 +271,11 @@ export default function App() {
 
   return <div className="studio">
     <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 頭對頭桌牌 · React PWA</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="print" onClick={()=>window.print()}><Printer size={17}/>列印 / PDF</button></div></header>
-    <main><LeftPanel/><section className="preview" ref={previewRef}><div className="preview-bar"><div><b>列印預覽</b><small>{guests.length} 位 · {Math.ceil(guests.length/2)} 頁</small></div><span>{Math.round(scale*100)}%</span></div><div className="canvas">{!pages.length?<div className="blank"><Sparkles size={26}/><h2>先放幾個名字進來</h2><p>批次貼上或逐張新增。字級、置中、正反面交給它處理。</p></div>:pages.map((pair,i)=><Page key={i} pair={pair} scale={scale}/>)}</div></section><SettingsPanel/></main>
+    <main className={`mobile-view-${mobileView}`}><LeftPanel/><section className="preview" ref={previewRef}><div className="preview-bar"><div><b>列印預覽</b><small>{guests.length} 位 · {Math.ceil(guests.length/2)} 頁</small></div><span>{Math.round(scale*100)}%</span></div><div className="canvas">{!pages.length?<div className="blank"><Sparkles size={26}/><h2>先放幾個名字進來</h2><p>批次貼上或逐張新增。字級、置中、正反面交給它處理。</p></div>:pages.map((pair,i)=><Page key={i} pair={pair} scale={scale}/>)}</div></section><SettingsPanel/></main>
+    <nav className="mobile-nav" aria-label="主要功能">
+      <button className={mobileView==='edit'?'active':''} onClick={()=>setMobileView('edit')}><List size={20}/><span>編輯</span></button>
+      <button className={mobileView==='preview'?'active':''} onClick={()=>setMobileView('preview')}><Eye size={20}/><span>預覽</span></button>
+      <button className={mobileView==='settings'?'active':''} onClick={()=>setMobileView('settings')}><SlidersHorizontal size={20}/><span>設定</span></button>
+    </nav>
   </div>
 }
