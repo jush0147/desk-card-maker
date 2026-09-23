@@ -45,30 +45,40 @@ function createWordRun(doc: XMLDocument, text: string, fontName: string, sizePt:
   return run
 }
 
-function replacePlaceholder(doc: XMLDocument, scope: Element, token: string, guest: WordGuest | undefined, fontName: string, bold: boolean) {
-  const texts = Array.from(scope.getElementsByTagNameNS(W, 't'))
-  const target = texts.find((node) => node.textContent?.includes(token))
-  if (!target) return
-
-  const paragraph = target.closest(q('p'))
-  if (!paragraph) return
-
-  for (const run of Array.from(paragraph.getElementsByTagNameNS(W, 'r'))) {
-    if (run.parentNode === paragraph) paragraph.removeChild(run)
+function findWordParagraph(node: Element) {
+  let current: Element | null = node
+  while (current) {
+    if (current.namespaceURI === W && current.localName === 'p') return current
+    current = current.parentElement
   }
+  return null
+}
 
-  const lines = guest?.lines.filter((line) => line.trim()) ?? []
-  if (!lines.length) return
+function replacePlaceholder(doc: XMLDocument, scope: Element, token: string, guest: WordGuest | undefined, fontName: string, bold: boolean) {
+  const targets = Array.from(scope.getElementsByTagNameNS(W, 't'))
+    .filter((node) => node.textContent?.includes(token))
 
-  lines.forEach((line, index) => {
-    if (index > 0) {
-      const breakRun = doc.createElementNS(W, q('r'))
-      breakRun.appendChild(doc.createElementNS(W, q('br')))
-      paragraph.appendChild(breakRun)
+  for (const target of targets) {
+    const paragraph = findWordParagraph(target)
+    if (!paragraph) continue
+
+    for (const run of Array.from(paragraph.getElementsByTagNameNS(W, 'r'))) {
+      if (run.parentNode === paragraph) paragraph.removeChild(run)
     }
-    const sizePt = guest?.sizesPt[index] ?? guest?.sizesPt[0] ?? 56
-    paragraph.appendChild(createWordRun(doc, line, fontName, sizePt, bold))
-  })
+
+    const lines = guest?.lines.filter((line) => line.trim()) ?? []
+    if (!lines.length) continue
+
+    lines.forEach((line, index) => {
+      if (index > 0) {
+        const breakRun = doc.createElementNS(W, q('r'))
+        breakRun.appendChild(doc.createElementNS(W, q('br')))
+        paragraph.appendChild(breakRun)
+      }
+      const sizePt = guest?.sizesPt[index] ?? guest?.sizesPt[0] ?? 56
+      paragraph.appendChild(createWordRun(doc, line, fontName, sizePt, bold))
+    })
+  }
 }
 
 function addPageBreak(doc: XMLDocument) {
@@ -136,11 +146,15 @@ export async function exportDeskCardsToWord(options: WordExportOptions) {
   })
 
   const url = URL.createObjectURL(blob)
+  const filename = `桌牌-${new Date().toISOString().slice(0, 10)}.docx`
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `桌牌-${new Date().toISOString().slice(0, 10)}.docx`
+  anchor.download = filename
+  anchor.rel = 'noopener'
+  anchor.style.display = 'none'
   document.body.appendChild(anchor)
   anchor.click()
   anchor.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1500)
+  setTimeout(() => URL.revokeObjectURL(url), 10000)
+  return filename
 }
