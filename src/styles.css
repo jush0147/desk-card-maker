@@ -255,3 +255,94 @@ body{color:var(--text);background:var(--soft)}
 
 .text-line{font-synthesis:weight}
 .field-note{display:block;margin-top:5px;font-size:9px;line-height:1.45;color:var(--muted)}
+
+
+/* Keep the preview laid out on compact screens even while another tab is active.
+   display:none made text auto-fit against a zero-sized page, so printing from Edit/Settings shrank text. */
+.mobile-label{display:none}
+.actions .word{
+  border:1px solid var(--border);
+  background:var(--panel);
+  color:var(--text);
+  font-weight:700
+}
+.actions .word:disabled{opacity:.4;cursor:not-allowed}
+
+@media(max-width:1100px){
+  .studio>main{display:block!important;position:relative!important;min-height:0!important}
+
+  .left-panel,.right-panel{
+    display:block!important;
+    position:absolute!important;
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    border:0!important;
+    visibility:hidden;
+    opacity:0;
+    pointer-events:none;
+    z-index:1
+  }
+
+  .preview{
+    display:grid!important;
+    position:absolute!important;
+    inset:0!important;
+    width:100%!important;
+    height:100%!important;
+    visibility:hidden;
+    opacity:0;
+    pointer-events:none;
+    z-index:1
+  }
+
+  .mobile-view-edit .left-panel,
+  .mobile-view-settings .right-panel,
+  .mobile-view-preview .preview{
+    visibility:visible;
+    opacity:1;
+    pointer-events:auto;
+    z-index:2
+  }
+}
+
+@media(max-width:760px){
+  .brand small,.actions a,.actions button:not(.print):not(.word){display:none!important}
+  .actions{gap:5px}
+  .actions .word,.actions .print{
+    display:inline-flex!important;
+    height:36px;
+    min-width:58px;
+    padding:0 9px;
+    gap:5px;
+    border-radius:9px;
+    font-size:12px
+  }
+  .desktop-label{display:none}
+  .mobile-label{display:inline}
+}
+
+@media(max-width:390px){
+  .brand>span{display:none}
+  .brand{min-width:0}
+  .brand b{font-size:13px}
+  .actions .word,.actions .print{min-width:54px;padding:0 8px}
+}
+
+@media print{
+  .left-panel,.right-panel{
+    display:none!important;
+    visibility:hidden!important;
+    opacity:0!important
+  }
+  .preview{
+    display:block!important;
+    position:static!important;
+    inset:auto!important;
+    visibility:visible!important;
+    opacity:1!important;
+    pointer-events:auto!important;
+    width:auto!important;
+    height:auto!important
+  }
+}
