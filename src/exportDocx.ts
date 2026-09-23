@@ -9,6 +9,7 @@ export type WordExportOptions = {
   guests: WordGuest[]
   fontName: string
   bold: boolean
+  showGuides: boolean
 }
 
 const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
@@ -81,6 +82,26 @@ function replacePlaceholder(doc: XMLDocument, scope: Element, token: string, gue
   }
 }
 
+function setTableGuides(doc: XMLDocument, table: Element, showGuides: boolean) {
+  const tblPr = table.getElementsByTagNameNS(W, 'tblPr')[0]
+  if (!tblPr) return
+
+  for (const existing of Array.from(tblPr.getElementsByTagNameNS(W, 'tblBorders'))) {
+    if (existing.parentNode === tblPr) tblPr.removeChild(existing)
+  }
+
+  const borders = doc.createElementNS(W, q('tblBorders'))
+  for (const edge of ['top', 'left', 'bottom', 'right', 'insideH', 'insideV']) {
+    const border = doc.createElementNS(W, q(edge))
+    border.setAttributeNS(W, q('val'), showGuides ? 'single' : 'nil')
+    border.setAttributeNS(W, q('sz'), '4')
+    border.setAttributeNS(W, q('space'), '0')
+    border.setAttributeNS(W, q('color'), 'auto')
+    borders.appendChild(border)
+  }
+  tblPr.appendChild(borders)
+}
+
 function addPageBreak(doc: XMLDocument) {
   const p = doc.createElementNS(W, q('p'))
   const r = doc.createElementNS(W, q('r'))
@@ -130,6 +151,7 @@ export async function exportDeskCardsToWord(options: WordExportOptions) {
 
     replacePlaceholder(doc, table, '[[G1]]', first, options.fontName, options.bold)
     replacePlaceholder(doc, table, '[[G2]]', second, options.fontName, options.bold)
+    setTableGuides(doc, table, options.showGuides)
     drawingId = renumberDrawingIds(table, drawingId)
 
     body.insertBefore(table, sectPr)
