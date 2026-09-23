@@ -160,3 +160,47 @@ body{color:var(--text);background:var(--soft)}
 @media(max-width:560px){
   .theme-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+
+/* Print must escape the app-shell viewport. Without this, desktop browsers can clip to the first 100dvh page. */
+@media print{
+  html,body,#root,.studio{
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  .studio{
+    display:block!important;
+  }
+  .studio>main{
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  .preview,.canvas{
+    width:auto!important;
+    height:auto!important;
+    min-height:0!important;
+    max-height:none!important;
+    overflow:visible!important;
+  }
+  .page-shell{
+    display:block!important;
+    position:relative!important;
+    width:210mm!important;
+    height:297mm!important;
+    overflow:visible!important;
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+    break-after:page!important;
+    page-break-after:always!important;
+  }
+  .page-shell:last-child{
+    break-after:auto!important;
+    page-break-after:auto!important;
+  }
+}
