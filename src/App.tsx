@@ -12,7 +12,40 @@ import { Download, Eye, Github, GripVertical, List, Plus, Printer, RotateCcw, Sl
 
 type Guest = { id: string; lines: string[] }
 type FontWeight = 500 | 600 | 700
+type DeskFontPreset = 'kai' | 'sans' | 'ming' | 'serif' | 'custom'
 type ThemeId = 'graphite' | 'ocean' | 'indigo' | 'emerald' | 'rose' | 'amber' | 'violet' | 'midnight'
+
+const FONT_PRESETS: Array<{ id: Exclude<DeskFontPreset, 'custom'>; name: string; description: string; stack: string }> = [
+  {
+    id: 'kai',
+    name: '標楷體',
+    description: '正式桌牌感',
+    stack: '"DFKai-SB", "BiauKai", "標楷體", "KaiTi", "STKaiti", serif',
+  },
+  {
+    id: 'sans',
+    name: '現代黑體',
+    description: '清楚、穩定',
+    stack: '"Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif',
+  },
+  {
+    id: 'ming',
+    name: '明體',
+    description: '正式印刷感',
+    stack: '"Noto Serif TC", "PMingLiU", "MingLiU", "Songti TC", serif',
+  },
+  {
+    id: 'serif',
+    name: '系統襯線',
+    description: '跨平台 fallback',
+    stack: 'serif',
+  },
+]
+
+function resolveDeskFont(preset: DeskFontPreset | undefined, customFamily: string) {
+  if (preset === 'custom' && customFamily) return `"${customFamily}", serif`
+  return FONT_PRESETS.find((font) => font.id === (preset ?? 'kai'))?.stack ?? FONT_PRESETS[0].stack
+}
 
 const UI_THEMES: Array<{ id: ThemeId; name: string; colors: [string, string, string] }> = [
   { id: 'graphite', name: 'Graphite', colors: ['#18181b', '#f5f5f4', '#d6d3d1'] },
@@ -29,6 +62,7 @@ type Settings = {
   sidePaddingMm: number
   lineGapMm: number
   fontWeight: FontWeight
+  fontPreset: DeskFontPreset
   showGuides: boolean
   imageSide: 'left' | 'right'
   imageWidthMm: number
@@ -39,7 +73,11 @@ type State = {
   imageUrl: string
   imageName: string
   uiTheme: ThemeId
+  customFontFamily: string
+  customFontName: string
   setUiTheme: (theme: ThemeId) => void
+  setCustomFont: (family: string, name: string) => void
+  clearCustomFont: () => void
   addGuest: () => void
   removeGuest: (id: string) => void
   updateGuest: (id: string, lines: string[]) => void
@@ -74,6 +112,7 @@ const useStore = create<State>()(
         sidePaddingMm: 5,
         lineGapMm: 1.6,
         fontWeight: 600,
+        fontPreset: 'kai',
         showGuides: true,
         imageSide: 'left',
         imageWidthMm: 40,
@@ -81,7 +120,11 @@ const useStore = create<State>()(
       imageUrl: '',
       imageName: '',
       uiTheme: 'graphite',
+      customFontFamily: '',
+      customFontName: '',
       setUiTheme: (uiTheme) => set({ uiTheme }),
+      setCustomFont: (customFontFamily, customFontName) => set({ customFontFamily, customFontName }),
+      clearCustomFont: () => set({ customFontFamily: '', customFontName: '' }),
       addGuest: () => set((s) => ({ guests: [...s.guests, guest()] })),
       removeGuest: (gid) => set((s) => ({ guests: s.guests.filter((g) => g.id !== gid) })),
       updateGuest: (gid, lines) => set((s) => ({ guests: s.guests.map((g) => g.id === gid ? { ...g, lines } : g) })),
@@ -100,7 +143,25 @@ const useStore = create<State>()(
     }),
     {
       name: 'desk-card-studio-v2',
-      partialize: (s) => ({ guests: s.guests, settings: s.settings, uiTheme: s.uiTheme }),
+      version: 3,
+      migrate: (persisted) => {
+        const previous = persisted as any
+        return {
+          ...previous,
+          settings: {
+            fontPreset: 'kai',
+            ...(previous?.settings ?? {}),
+          },
+        }
+      },
+      partialize: (s) => ({
+        guests: s.guests,
+        settings: {
+          ...s.settings,
+          fontPreset: s.settings.fontPreset === 'custom' ? 'kai' : s.settings.fontPreset,
+        },
+        uiTheme: s.uiTheme,
+      }),
     },
   ),
 )
@@ -133,7 +194,7 @@ function measureText(el: Element) {
   return rect
 }
 
-function useAutoFit(ref: React.RefObject<HTMLDivElement | null>, lines: string[], settings: Settings) {
+function useAutoFit(ref: React.RefObject<HTMLDivElement | null>, lines: string[], settings: Settings, fontFamily: string) {
   useLayoutEffect(() => {
     const cell = ref.current
     if (!cell || !lines.length) return
@@ -158,6 +219,7 @@ function useAutoFit(ref: React.RefObject<HTMLDivElement | null>, lines: string[]
             const mid = (low + high) / 2
             line.style.fontSize = `${mid}px`
             line.style.fontWeight = String(settings.fontWeight)
+            line.style.fontFamily = fontFamily
             const r = measureText(line)
             if (r.width <= usableW * settings.fillRatio && r.height <= perLineH * .92) low = mid
             else high = mid
@@ -171,17 +233,19 @@ function useAutoFit(ref: React.RefObject<HTMLDivElement | null>, lines: string[]
     const ro = new ResizeObserver(fit)
     ro.observe(cell)
     return () => { cancelAnimationFrame(raf); ro.disconnect() }
-  }, [ref, lines.join('\n'), settings.fillRatio, settings.fontWeight, settings.sidePaddingMm, settings.lineGapMm])
+  }, [ref, lines.join('\n'), settings.fillRatio, settings.fontWeight, settings.sidePaddingMm, settings.lineGapMm, fontFamily])
 }
 
 function Face({ guest, inverted = false }: { guest?: Guest; inverted?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const settings = useStore((s) => s.settings)
   const imageUrl = useStore((s) => s.imageUrl)
+  const customFontFamily = useStore((s) => s.customFontFamily)
   const lines = guest?.lines.filter((x) => x.trim()) ?? []
-  useAutoFit(ref, lines, settings)
+  const fontFamily = resolveDeskFont(settings.fontPreset, customFontFamily)
+  useAutoFit(ref, lines, settings, fontFamily)
   const image = imageUrl ? <div className="desk-image" style={{ width: `${settings.imageWidthMm}mm` }}><img src={imageUrl} alt="" /></div> : null
-  const text = <div ref={ref} className="desk-text" style={{ paddingLeft: `${settings.sidePaddingMm}mm`, paddingRight: `${settings.sidePaddingMm}mm` }}>
+  const text = <div ref={ref} className="desk-text" style={{ paddingLeft: `${settings.sidePaddingMm}mm`, paddingRight: `${settings.sidePaddingMm}mm`, fontFamily }}>
     <div data-stack className="text-stack" style={{ gap: `${settings.lineGapMm}mm` }}>
       {lines.map((line, i) => <div data-line className="text-line" style={{ fontWeight: settings.fontWeight }} key={`${line}-${i}`}>{line}</div>)}
     </div>
@@ -240,14 +304,38 @@ function LeftPanel() {
 
 function SettingsPanel() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const fontFileRef = useRef<HTMLInputElement>(null)
+  const [fontError, setFontError] = useState('')
   const settings = useStore((s) => s.settings)
   const update = useStore((s) => s.updateSettings)
   const imageUrl = useStore((s) => s.imageUrl)
   const imageName = useStore((s) => s.imageName)
   const setImage = useStore((s) => s.setImage)
   const clear = useStore((s) => s.clearImage)
+  const customFontFamily = useStore((s) => s.customFontFamily)
+  const customFontName = useStore((s) => s.customFontName)
+  const setCustomFont = useStore((s) => s.setCustomFont)
+  const clearCustomFont = useStore((s) => s.clearCustomFont)
   const uiTheme = useStore((s) => s.uiTheme)
   const setUiTheme = useStore((s) => s.setUiTheme)
+  const chooseFont = async (file?: File) => {
+    if (!file) return
+    setFontError('')
+    const family = `DeskCustomFont-${Date.now()}`
+    const url = URL.createObjectURL(file)
+    try {
+      const face = new FontFace(family, `url("${url}")`)
+      await face.load()
+      document.fonts.add(face)
+      setCustomFont(family, file.name)
+      update({ fontPreset: 'custom' })
+    } catch {
+      setFontError('字型載入失敗，請改用 TTF / OTF / WOFF / WOFF2。')
+    } finally {
+      URL.revokeObjectURL(url)
+      if (fontFileRef.current) fontFileRef.current.value = ''
+    }
+  }
   const choose = (file?: File) => {
     if (!file || !file.type.startsWith('image/')) return
     if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl)
@@ -271,6 +359,45 @@ function SettingsPanel() {
         </button>)}
       </div>
       <small>只改操作介面，A4 列印內容維持黑白。</small>
+    </div>
+    <div className="setting-card font-card"><label className="cap">桌牌字型</label>
+      <div className="font-grid">
+        {FONT_PRESETS.map((font) => <button
+          key={font.id}
+          type="button"
+          className={`font-option ${settings.fontPreset === font.id ? 'active' : ''}`}
+          style={{ fontFamily: font.stack }}
+          onClick={() => update({ fontPreset: font.id })}
+        >
+          <span className="font-sample">永續科</span>
+          <span><b>{font.name}</b><small>{font.description}</small></span>
+        </button>)}
+        {customFontFamily && <button
+          type="button"
+          className={`font-option ${settings.fontPreset === 'custom' ? 'active' : ''}`}
+          style={{ fontFamily: `"${customFontFamily}", serif` }}
+          onClick={() => update({ fontPreset: 'custom' })}
+        >
+          <span className="font-sample">永續科</span>
+          <span><b>自訂字型</b><small>{customFontName}</small></span>
+        </button>}
+      </div>
+      <input
+        ref={fontFileRef}
+        hidden
+        type="file"
+        accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2"
+        onChange={(e) => chooseFont(e.target.files?.[0])}
+      />
+      <div className="font-actions">
+        <button className="upload" type="button" onClick={() => fontFileRef.current?.click()}><Upload size={17}/>上傳自訂字型</button>
+        {customFontFamily && <button className="icon" type="button" title="清除自訂字型" onClick={() => {
+          clearCustomFont()
+          if (settings.fontPreset === 'custom') update({ fontPreset: 'kai' })
+        }}><RotateCcw size={16}/></button>}
+      </div>
+      {fontError && <div className="font-error">{fontError}</div>}
+      <small>標楷體會優先使用裝置內建字型；找不到時會 fallback。自訂字型只留在目前工作階段，不會上傳。</small>
     </div>
     <div className="setting-card"><label className="cap">模板</label><b>A4 雙桌牌（實測）</b><div className="chips"><span>A4 直式</span><span>2 位 / 頁</span><span>上倒下正</span></div><small>橫線：{GUIDE_MM.join(' / ')} mm</small></div>
     <div className="setting-card"><label className="cap">文字</label>
