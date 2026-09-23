@@ -11,7 +11,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Download, Eye, Github, GripVertical, List, Plus, Printer, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload } from 'lucide-react'
 
 type Guest = { id: string; lines: string[] }
-type FontWeight = 500 | 600 | 700
+type FontWeight = 400 | 500 | 600 | 700
 type DeskFontPreset = 'kai' | 'sans' | 'ming' | 'serif' | 'custom'
 type ThemeId = 'graphite' | 'ocean' | 'indigo' | 'emerald' | 'rose' | 'amber' | 'violet' | 'midnight'
 
@@ -243,11 +243,12 @@ function Face({ guest, inverted = false }: { guest?: Guest; inverted?: boolean }
   const customFontFamily = useStore((s) => s.customFontFamily)
   const lines = guest?.lines.filter((x) => x.trim()) ?? []
   const fontFamily = resolveDeskFont(settings.fontPreset, customFontFamily)
-  useAutoFit(ref, lines, settings, fontFamily)
+  const effectiveFontWeight: FontWeight = settings.fontPreset === 'kai' ? 400 : settings.fontWeight
+  useAutoFit(ref, lines, { ...settings, fontWeight: effectiveFontWeight }, fontFamily)
   const image = imageUrl ? <div className="desk-image" style={{ width: `${settings.imageWidthMm}mm` }}><img src={imageUrl} alt="" /></div> : null
   const text = <div ref={ref} className="desk-text" style={{ paddingLeft: `${settings.sidePaddingMm}mm`, paddingRight: `${settings.sidePaddingMm}mm`, fontFamily }}>
     <div data-stack className="text-stack" style={{ gap: `${settings.lineGapMm}mm` }}>
-      {lines.map((line, i) => <div data-line className="text-line" style={{ fontWeight: settings.fontWeight }} key={`${line}-${i}`}>{line}</div>)}
+      {lines.map((line, i) => <div data-line className="text-line" style={{ fontWeight: effectiveFontWeight }} key={`${line}-${i}`}>{line}</div>)}
     </div>
   </div>
   return <section className={`face ${inverted ? 'inverted' : ''}`}>{settings.imageSide === 'left' ? <>{image}{text}</> : <>{text}{image}</>}</section>
@@ -367,7 +368,10 @@ function SettingsPanel() {
           type="button"
           className={`font-option ${settings.fontPreset === font.id ? 'active' : ''}`}
           style={{ fontFamily: font.stack }}
-          onClick={() => update({ fontPreset: font.id })}
+          onClick={() => update({
+            fontPreset: font.id,
+            fontWeight: font.id === 'kai' ? 400 : (settings.fontWeight === 400 ? 600 : settings.fontWeight),
+          })}
         >
           <span className="font-name-preview">{font.name}</span>
         </button>)}
@@ -375,7 +379,10 @@ function SettingsPanel() {
           type="button"
           className={`font-option ${settings.fontPreset === 'custom' ? 'active' : ''}`}
           style={{ fontFamily: `"${customFontFamily}", serif` }}
-          onClick={() => update({ fontPreset: 'custom' })}
+          onClick={() => update({
+            fontPreset: 'custom',
+            fontWeight: settings.fontWeight === 400 ? 600 : settings.fontWeight,
+          })}
         >
           <span className="font-name-preview">{customFontName || '自訂字型'}</span>
         </button>}
@@ -400,7 +407,7 @@ function SettingsPanel() {
     <div className="setting-card"><label className="cap">模板</label><b>A4 雙桌牌（實測）</b><div className="chips"><span>A4 直式</span><span>2 位 / 頁</span><span>上倒下正</span></div><small>橫線：{GUIDE_MM.join(' / ')} mm</small></div>
     <div className="setting-card"><label className="cap">文字</label>
       <label className="field"><span>填滿程度 <b>{Math.round(settings.fillRatio*100)}%</b></span><input type="range" min="70" max="94" value={Math.round(settings.fillRatio*100)} onChange={(e) => update({ fillRatio: +e.target.value/100 })}/></label>
-      <label className="field"><span>字重</span><select value={settings.fontWeight} onChange={(e) => update({ fontWeight: +e.target.value as FontWeight })}><option value="500">500 Medium</option><option value="600">600 Semibold</option><option value="700">700 Bold</option></select></label>
+      <label className="field"><span>字重 {settings.fontPreset === 'kai' && <b>固定 Regular</b>}</span><select disabled={settings.fontPreset === 'kai'} value={settings.fontPreset === 'kai' ? 400 : settings.fontWeight} onChange={(e) => update({ fontWeight: +e.target.value as FontWeight })}><option value="400">400 Regular</option><option value="500">500 Medium</option><option value="600">600 Semibold</option><option value="700">700 Bold</option></select>{settings.fontPreset === 'kai' && <small className="field-note">系統標楷體通常只有單一字重；粗體選項不會真的換一套較粗字型。</small>}</label>
       <div className="two"><label className="field"><span>左右留白 mm</span><input type="number" min="2" max="20" step=".5" value={settings.sidePaddingMm} onChange={(e)=>update({sidePaddingMm:+e.target.value||5})}/></label><label className="field"><span>行距 mm</span><input type="number" min="0" max="10" step=".2" value={settings.lineGapMm} onChange={(e)=>update({lineGapMm:+e.target.value||0})}/></label></div>
     </div>
     <div className="setting-card"><label className="cap">圖片（選用）</label><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e)=>choose(e.target.files?.[0])}/>
