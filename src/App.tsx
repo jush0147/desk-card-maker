@@ -369,8 +369,7 @@ function SettingsPanel() {
           style={{ fontFamily: font.stack }}
           onClick={() => update({ fontPreset: font.id })}
         >
-          <span className="font-sample">永續科</span>
-          <span><b>{font.name}</b><small>{font.description}</small></span>
+          <span className="font-name-preview">{font.name}</span>
         </button>)}
         {customFontFamily && <button
           type="button"
@@ -378,8 +377,7 @@ function SettingsPanel() {
           style={{ fontFamily: `"${customFontFamily}", serif` }}
           onClick={() => update({ fontPreset: 'custom' })}
         >
-          <span className="font-sample">永續科</span>
-          <span><b>自訂字型</b><small>{customFontName}</small></span>
+          <span className="font-name-preview">{customFontName || '自訂字型'}</span>
         </button>}
       </div>
       <input
