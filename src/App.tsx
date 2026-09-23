@@ -464,6 +464,8 @@ export default function App() {
   )
   const scale = useScale(previewRef, mobileView)
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null)
+  const [wordState, setWordState] = useState<'idle' | 'working' | 'success' | 'error'>('idle')
+  const [wordMessage, setWordMessage] = useState('')
   const pages: Array<[Guest|undefined,Guest|undefined]> = []
   for(let i=0;i<guests.length;i+=2) pages.push([guests[i],guests[i+1]])
 
@@ -485,31 +487,47 @@ export default function App() {
   }, [uiTheme])
 
   const exportWord = async () => {
-    if (!guests.length) return
+    if (!guests.length || wordState === 'working') return
 
-    const pageElements = Array.from(document.querySelectorAll<HTMLElement>('.page-grid'))
-    const wordGuests: WordGuest[] = guests.map((guestItem, guestIndex) => {
-      const pageIndex = Math.floor(guestIndex / 2)
-      const faceIndex = guestIndex % 2 === 0 ? 1 : 3
-      const face = pageElements[pageIndex]?.querySelectorAll<HTMLElement>('.face')[faceIndex]
-      const sizesPt = face
-        ? Array.from(face.querySelectorAll<HTMLElement>('.text-line')).map((line) => {
-            const px = Number.parseFloat(getComputedStyle(line).fontSize) || 74
-            return Math.max(8, px * 0.75)
-          })
-        : guestItem.lines.map(() => 56)
+    setWordState('working')
+    setWordMessage('正在產生 Word…')
 
-      return {
-        lines: guestItem.lines.filter((line) => line.trim()),
-        sizesPt,
-      }
-    })
+    try {
+      const pageElements = Array.from(document.querySelectorAll<HTMLElement>('.page-grid'))
+      const wordGuests: WordGuest[] = guests.map((guestItem, guestIndex) => {
+        const pageIndex = Math.floor(guestIndex / 2)
+        const faceIndex = guestIndex % 2 === 0 ? 1 : 3
+        const face = pageElements[pageIndex]?.querySelectorAll<HTMLElement>('.face')[faceIndex]
+        const sizesPt = face
+          ? Array.from(face.querySelectorAll<HTMLElement>('.text-line')).map((line) => {
+              const px = Number.parseFloat(getComputedStyle(line).fontSize) || 74
+              return Math.max(8, px * 0.75)
+            })
+          : guestItem.lines.map(() => 56)
 
-    await exportDeskCardsToWord({
-      guests: wordGuests,
-      fontName: resolveWordFontName(settings.fontPreset, customFontName),
-      bold: settings.fontWeight >= 600,
-    })
+        return {
+          lines: guestItem.lines.filter((line) => line.trim()),
+          sizesPt,
+        }
+      })
+
+      const filename = await exportDeskCardsToWord({
+        guests: wordGuests,
+        fontName: resolveWordFontName(settings.fontPreset, customFontName),
+        bold: settings.fontWeight >= 600,
+      })
+
+      setWordState('success')
+      setWordMessage(`已產生 ${filename}`)
+      window.setTimeout(() => {
+        setWordState('idle')
+        setWordMessage('')
+      }, 3500)
+    } catch (error) {
+      console.error('Word export failed', error)
+      setWordState('error')
+      setWordMessage(error instanceof Error ? `Word 匯出失敗：${error.message}` : 'Word 匯出失敗')
+    }
   }
 
   useEffect(() => {
@@ -519,8 +537,9 @@ export default function App() {
   }, [])
 
   return <div className="studio">
-    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 頭對頭桌牌 · React PWA</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="word" disabled={!guests.length} onClick={exportWord} aria-label="匯出 Word" title="匯出 Word"><FileText size={17}/><span className="desktop-label">匯出 Word</span><span className="mobile-label">Word</span></button><button className="print" onClick={()=>window.print()} aria-label="列印或另存 PDF" title="列印 / PDF"><Printer size={17}/><span className="desktop-label">列印 / PDF</span><span className="mobile-label">列印</span></button></div></header>
+    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 頭對頭桌牌 · React PWA</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="word" disabled={!guests.length || wordState === 'working'} onClick={exportWord} aria-label="匯出 Word" title="匯出 Word"><FileText size={17}/><span className="desktop-label">{wordState === 'working' ? '產生中…' : '匯出 Word'}</span><span className="mobile-label">{wordState === 'working' ? '處理中' : 'Word'}</span></button><button className="print" onClick={()=>window.print()} aria-label="列印或另存 PDF" title="列印 / PDF"><Printer size={17}/><span className="desktop-label">列印 / PDF</span><span className="mobile-label">列印</span></button></div></header>
     <main className={`mobile-view-${mobileView}`}><LeftPanel/><section className="preview" ref={previewRef}><div className="preview-bar"><div><b>列印預覽</b><small>{guests.length} 位 · {Math.ceil(guests.length/2)} 頁</small></div><span>{Math.round(scale*100)}%</span></div><div className="canvas">{!pages.length?<div className="blank"><Sparkles size={26}/><h2>先放幾個名字進來</h2><p>批次貼上或逐張新增。字級、置中、正反面交給它處理。</p></div>:pages.map((pair,i)=><Page key={i} pair={pair} scale={scale}/>)}</div></section><SettingsPanel/></main>
+    {wordMessage && <div className={`word-toast ${wordState}`} role="status">{wordMessage}</div>}
     <nav className="mobile-nav" aria-label="主要功能">
       <button className={mobileView==='edit'?'active':''} onClick={()=>setMobileView('edit')}><List size={20}/><span>編輯</span></button>
       <button className={mobileView==='preview'?'active':''} onClick={()=>setMobileView('preview')}><Eye size={20}/><span>預覽</span></button>
