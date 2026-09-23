@@ -64,14 +64,14 @@ function kaiStroke(weight: FontWeight) {
 }
 
 const UI_THEMES: Array<{ id: ThemeId; name: string; colors: [string, string, string] }> = [
-  { id: 'graphite', name: 'Graphite', colors: ['#18181b', '#f5f5f4', '#d6d3d1'] },
-  { id: 'ocean', name: 'Ocean', colors: ['#0369a1', '#f0f9ff', '#bae6fd'] },
-  { id: 'indigo', name: 'Indigo', colors: ['#4f46e5', '#f5f3ff', '#c7d2fe'] },
-  { id: 'emerald', name: 'Emerald', colors: ['#047857', '#ecfdf5', '#a7f3d0'] },
-  { id: 'rose', name: 'Rose', colors: ['#be123c', '#fff1f2', '#fecdd3'] },
-  { id: 'amber', name: 'Amber', colors: ['#b45309', '#fffbeb', '#fde68a'] },
-  { id: 'violet', name: 'Violet', colors: ['#7c3aed', '#f5f3ff', '#ddd6fe'] },
-  { id: 'midnight', name: 'Midnight', colors: ['#38bdf8', '#0f172a', '#334155'] },
+  { id: 'graphite', name: 'Linen', colors: ['#1f1f1d', '#f4f0e8', '#ded8cc'] },
+  { id: 'ocean', name: 'Paper', colors: ['#202124', '#f7f7f5', '#deded9'] },
+  { id: 'indigo', name: 'Mist', colors: ['#2c2f33', '#eef0f2', '#d8dce0'] },
+  { id: 'emerald', name: 'Stone', colors: ['#292827', '#e8e6e1', '#ccc8c1'] },
+  { id: 'rose', name: 'Graphite', colors: ['#f4f4f5', '#292929', '#3a3a3a'] },
+  { id: 'amber', name: 'VS Dark', colors: ['#cccccc', '#1e1e1e', '#333333'] },
+  { id: 'violet', name: 'Carbon', colors: ['#eeeeee', '#181818', '#2a2a2a'] },
+  { id: 'midnight', name: 'OLED Black', colors: ['#f5f5f5', '#000000', '#1a1a1a'] },
 ]
 type Settings = {
   fillRatio: number
