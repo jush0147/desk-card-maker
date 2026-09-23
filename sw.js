@@ -1,4 +1,4 @@
-const CACHE_NAME = 'desk-card-maker-v1';
+const CACHE_NAME = 'desk-card-maker-v2';
 const APP_SHELL = [
   './',
   './index.html',
