@@ -23,7 +23,10 @@
     --panel: #fff;
     --border: #d8d8d8;
     --accent: #1769aa;
-    --page-line: #aaa;
+    --page-line: #666;
+    --layout-top: 5.5mm;
+    --layout-side: 6mm;
+    --row-h: 68.6mm;
   }
   * { box-sizing: border-box; }
   html { font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", system-ui, sans-serif; }
@@ -53,8 +56,23 @@
   .page-wrap { width: fit-content; margin: 0 auto 18px; }
   .page {
     width: var(--page-w); height: var(--page-h); background: #fff; color: #111;
-    display: grid; grid-template-rows: repeat(4, minmax(0, 1fr));
+    position: relative;
+    display: grid;
+    grid-template-rows: repeat(4, var(--row-h));
+    align-content: start;
+    padding: var(--layout-top) var(--layout-side) 0;
     box-shadow: 0 2px 18px rgba(0,0,0,.13); break-after: page; page-break-after: always;
+  }
+  .page::before {
+    content: "";
+    position: absolute;
+    left: var(--layout-side);
+    right: var(--layout-side);
+    top: var(--layout-top);
+    height: calc(var(--row-h) * 4);
+    border: .2mm solid var(--page-line);
+    pointer-events: none;
+    z-index: 2;
   }
   .face {
     min-height: 0; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr);
@@ -68,11 +86,17 @@
   .text-cell { min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 4mm; }
   .text-stack { width: 100%; max-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 1.4mm; overflow: hidden; }
   .text-line { white-space: nowrap; text-align: center; line-height: 1.02; font-weight: 500; }
-  .page { position: relative; }
-  .guide { position: absolute; left: 4mm; right: 4mm; z-index: 2; pointer-events: none; }
-  .guide.fold-1 { top: 25%; border-top: .2mm dotted #c9c9c9; }
-  .guide.cut { top: 50%; left: 0; right: 0; border-top: .25mm dashed var(--page-line); }
-  .guide.fold-2 { top: 75%; border-top: .2mm dotted #c9c9c9; }
+  .guide {
+    position: absolute;
+    left: var(--layout-side);
+    right: var(--layout-side);
+    z-index: 3;
+    pointer-events: none;
+    border-top: .2mm solid var(--page-line);
+  }
+  .guide.fold-1 { top: calc(var(--layout-top) + var(--row-h)); }
+  .guide.cut { top: calc(var(--layout-top) + var(--row-h) * 2); }
+  .guide.fold-2 { top: calc(var(--layout-top) + var(--row-h) * 3); }
   .empty { max-width: 720px; margin: 36px auto; padding: 28px; text-align: center; color: var(--muted); border: 1px dashed var(--border); border-radius: 12px; }
   @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; }
@@ -115,6 +139,9 @@
         <input id="gap" type="number" min="0" max="12" step="0.2" value="1.4">
       </div>
     </div>
+    <label for="fill">字體填滿程度（%）</label>
+    <input id="fill" type="number" min="65" max="95" step="1" value="88">
+    <p class="image-note">88% 大致貼近參考檔最後一頁的視覺密度；想更鬆可降到 82–85%。</p>
 
     <label for="imageInput">圖片（選用）</label>
     <input id="imageInput" type="file" accept="image/*">
@@ -133,7 +160,7 @@
   </aside>
 
   <main class="preview">
-    <p class="preview-title">A4 直式，每頁 2 位；每位佔半張 A4，上半面倒轉 180°、下半面正向。中間虛線是裁切位置，細點線是每張桌牌的折線參考。</p>
+    <p class="preview-title">A4 直式，每頁 2 位；每位上方倒轉、下方正向。橫線位置依照參考檔最後一頁：距頁首約 74.1、142.7、211.3 mm。</p>
     <div id="pages"></div>
   </main>
 </div>
@@ -145,6 +172,7 @@
   const pagesEl = $('#pages');
   const paddingEl = $('#padding');
   const gapEl = $('#gap');
+  const fillEl = $('#fill');
   const imageInput = $('#imageInput');
   const clearImageBtn = $('#clearImageBtn');
   const imageState = $('#imageState');
@@ -258,7 +286,8 @@
       const usableHeight = Math.max(1, height - gapPx * Math.max(0, lines.length - 1));
       const perLineHeight = usableHeight / lines.length;
 
-      for (const line of lines) fitLine(line, width, perLineHeight * 0.94);
+      const fillRatio = clampNumber(fillEl, 88, 65, 95) / 100;
+      for (const line of lines) fitLine(line, width * fillRatio, perLineHeight * 0.94);
 
       const stackRect = stack.getBoundingClientRect();
       const cellRect = textCell.getBoundingClientRect();
@@ -356,6 +385,7 @@
   dataEl.addEventListener('input', scheduleRender);
   paddingEl.addEventListener('input', scheduleRender);
   gapEl.addEventListener('input', scheduleRender);
+  fillEl.addEventListener('input', scheduleRender);
   renderBtn.addEventListener('click', render);
   printBtn.addEventListener('click', () => window.print());
 
