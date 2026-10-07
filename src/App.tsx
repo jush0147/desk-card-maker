@@ -387,9 +387,6 @@ function SettingsPanel() {
   const setCustomFont = useStore((s) => s.setCustomFont)
   const clearCustomFont = useStore((s) => s.clearCustomFont)
   const uiTheme = useStore((s) => s.uiTheme)
-  const notice = useStore((s) => s.notice)
-  const undoNotice = useStore((s) => s.undoNotice)
-  const clearNotice = useStore((s) => s.clearNotice)
   const setUiTheme = useStore((s) => s.setUiTheme)
   const chooseFont = async (file?: File) => {
     if (!file) return
@@ -496,6 +493,9 @@ export default function App() {
   const settings = useStore((s) => s.settings)
   const customFontName = useStore((s) => s.customFontName)
   const uiTheme = useStore((s) => s.uiTheme)
+  const notice = useStore((s) => s.notice)
+  const undoNotice = useStore((s) => s.undoNotice)
+  const clearNotice = useStore((s) => s.clearNotice)
   const [mobileView, setMobileView] = useState<'edit' | 'preview' | 'settings'>(() =>
     useStore.getState().guests.length ? 'preview' : 'edit'
   )
