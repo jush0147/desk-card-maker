@@ -78,6 +78,8 @@ type Settings = {
   imageSide: 'left' | 'right'
   imageWidthMm: number
 }
+type Notice = { message: string; previousGuests?: Guest[] }
+
 type State = {
   guests: Guest[]
   settings: Settings
@@ -86,6 +88,7 @@ type State = {
   uiTheme: ThemeId
   customFontFamily: string
   customFontName: string
+  notice: Notice | null
   setUiTheme: (theme: ThemeId) => void
   setCustomFont: (family: string, name: string) => void
   clearCustomFont: () => void
@@ -98,6 +101,8 @@ type State = {
   updateSettings: (patch: Partial<Settings>) => void
   setImage: (url: string, name: string) => void
   clearImage: () => void
+  undoNotice: () => void
+  clearNotice: () => void
 }
 
 const TEMPLATE = {
@@ -133,14 +138,34 @@ const useStore = create<State>()(
       uiTheme: 'system',
       customFontFamily: '',
       customFontName: '',
+      notice: null,
       setUiTheme: (uiTheme) => set({ uiTheme }),
       setCustomFont: (customFontFamily, customFontName) => set({ customFontFamily, customFontName }),
       clearCustomFont: () => set({ customFontFamily: '', customFontName: '' }),
       addGuest: () => set((s) => ({ guests: [...s.guests, guest()] })),
-      removeGuest: (gid) => set((s) => ({ guests: s.guests.filter((g) => g.id !== gid) })),
+      removeGuest: (gid) => set((s) => {
+        const index = s.guests.findIndex((g) => g.id === gid)
+        if (index < 0) return s
+        return {
+          guests: s.guests.filter((g) => g.id !== gid),
+          notice: {
+            message: `已刪除第 ${index + 1} 位`,
+            previousGuests: s.guests.map((g) => ({ ...g, lines: [...g.lines] })),
+          },
+        }
+      }),
       updateGuest: (gid, lines) => set((s) => ({ guests: s.guests.map((g) => g.id === gid ? { ...g, lines } : g) })),
-      replaceGuests: (blocks) => set({ guests: blocks.map(guest) }),
-      appendGuests: (blocks) => set((s) => ({ guests: [...s.guests, ...blocks.map(guest)] })),
+      replaceGuests: (blocks) => set((s) => ({
+        guests: blocks.map(guest),
+        notice: {
+          message: `已以 ${blocks.length} 位取代名單`,
+          previousGuests: s.guests.map((g) => ({ ...g, lines: [...g.lines] })),
+        },
+      })),
+      appendGuests: (blocks) => set((s) => ({
+        guests: [...s.guests, ...blocks.map(guest)],
+        notice: { message: `已加入 ${blocks.length} 位` },
+      })),
       reorder: (from, to) => set((s) => {
         const next = [...s.guests]
         const [moved] = next.splice(from, 1)
@@ -151,10 +176,17 @@ const useStore = create<State>()(
       updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
       setImage: (imageUrl, imageName) => set({ imageUrl, imageName }),
       clearImage: () => set({ imageUrl: '', imageName: '' }),
+      undoNotice: () => set((s) => s.notice?.previousGuests
+        ? {
+            guests: s.notice.previousGuests.map((g) => ({ ...g, lines: [...g.lines] })),
+            notice: null,
+          }
+        : { notice: null }),
+      clearNotice: () => set({ notice: null }),
     }),
     {
       name: 'desk-card-studio-v2',
-      version: 5,
+      version: 6,
       migrate: (persisted) => {
         const previous = persisted as any
         const previousSettings = previous?.settings ?? {}
@@ -288,7 +320,7 @@ function Face({ guest, inverted = false }: { guest?: Guest; inverted?: boolean }
       >{line}</div>)}
     </div>
   </div>
-  return <section className={`face ${inverted ? 'inverted' : ''}`}>{settings.imageSide === 'left' ? <>{image}{text}</> : <>{text}{image}</>}</section>
+  return <section className={`face ${inverted ? 'inverted' : ''}`} aria-hidden={inverted ? true : undefined}>{settings.imageSide === 'left' ? <>{image}{text}</> : <>{text}{image}</>}</section>
 }
 
 function Page({ pair, scale }: { pair: [Guest | undefined, Guest | undefined]; scale: number }) {
@@ -311,7 +343,7 @@ function SortableGuest({ item, index }: { item: Guest; index: number }) {
   return <div ref={setNodeRef} className={`guest-card ${isDragging ? 'dragging' : ''}`} style={{ transform: CSS.Transform.toString(transform), transition }}>
     <button className="drag" aria-label={`拖曳第 ${index + 1} 位`} {...attributes} {...listeners}><GripVertical size={18}/></button>
     <div className="guest-body"><span>#{index + 1}</span><textarea value={item.lines.join('\n')} rows={Math.max(2, item.lines.length)} onChange={(e) => update(item.id, e.target.value.split('\n'))} placeholder={'單位名稱\n姓名 職稱'} /></div>
-    <button className="icon danger" aria-label="刪除" onClick={() => remove(item.id)}><Trash2 size={17}/></button>
+    <button className="icon danger" aria-label={`刪除第 ${index + 1} 位`} onClick={() => remove(item.id)}><Trash2 size={17}/></button>
   </div>
 }
 
@@ -329,13 +361,21 @@ function LeftPanel() {
     const a = guests.findIndex((g) => g.id === active.id), b = guests.findIndex((g) => g.id === over.id)
     if (a >= 0 && b >= 0) reorder(a, b)
   }
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (guests.length) return
+    const pastedBlocks = parseBlocks(e.clipboardData.getData('text'))
+    if (!pastedBlocks.length) return
+    e.preventDefault()
+    replace(pastedBlocks)
+    setRaw('')
+  }
   return <aside className="left-panel">
-    <details className="bulk"><summary>批次貼上 <small>空白行分隔下一位</small></summary><div className="bulk-body">
-      <textarea value={raw} rows={7} onChange={(e) => setRaw(e.target.value)} placeholder={'單位名稱\n姓名 職稱\n\n下一位\n姓名 職稱'} />
-      <div className="bulk-actions"><span>{blocks.length} 位</span><button disabled={!blocks.length} onClick={() => append(blocks)}>追加</button><button className="dark" disabled={!blocks.length} onClick={() => replace(blocks)}>取代名單</button></div>
+    <details className="bulk" open><summary>直接貼上名單 <small>空白行分隔下一位</small></summary><div className="bulk-body">
+      <textarea value={raw} rows={7} onChange={(e) => setRaw(e.target.value)} onPaste={handlePaste} placeholder={'單位名稱\n姓名 職稱\n\n下一位\n姓名 職稱'} aria-label="批次貼上桌牌名單" />
+      <div className="bulk-actions"><span>{blocks.length} 位</span><button disabled={!blocks.length} onClick={() => { append(blocks); setRaw('') }}>追加</button><button className="dark" disabled={!blocks.length} onClick={() => { replace(blocks); setRaw('') }}>取代名單</button></div>
     </div></details>
     <div className="section-title"><div><b>桌牌名單</b><small>拖曳調整列印順序</small></div><button onClick={add}><Plus size={15}/>新增</button></div>
-    {!guests.length ? <button className="empty" onClick={add}><Plus size={19}/>新增第一位桌牌</button> :
+    {!guests.length ? <div className="empty"><Plus size={19}/><span>直接在上方貼上名單，或按「新增」逐張建立。</span></div> :
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={dragEnd}><SortableContext items={guests.map((g) => g.id)} strategy={verticalListSortingStrategy}><div className="guest-list">{guests.map((g,i) => <SortableGuest key={g.id} item={g} index={i}/>)}</div></SortableContext></DndContext>}
   </aside>
 }
@@ -405,6 +445,7 @@ function SettingsPanel() {
             fontPreset: font.id,
             fontWeight: settings.fontWeight === 400 ? 600 : settings.fontWeight,
           })}
+          aria-pressed={settings.fontPreset === font.id}
         >
           <span className="font-name-preview">{font.name}</span>
         </button>)}
@@ -416,6 +457,7 @@ function SettingsPanel() {
             fontPreset: 'custom',
             fontWeight: settings.fontWeight === 400 ? 600 : settings.fontWeight,
           })}
+          aria-pressed={settings.fontPreset === 'custom'}
         >
           <span className="font-name-preview">{customFontName || '自訂字型'}</span>
         </button>}
@@ -429,7 +471,7 @@ function SettingsPanel() {
       />
       <div className="font-actions">
         <button className="upload" type="button" onClick={() => fontFileRef.current?.click()}><Upload size={17}/>上傳自訂字型</button>
-        {customFontFamily && <button className="icon" type="button" title="清除自訂字型" onClick={() => {
+        {customFontFamily && <button className="icon" type="button" title="清除自訂字型" aria-label="清除自訂字型" onClick={() => {
           clearCustomFont()
           if (settings.fontPreset === 'custom') update({ fontPreset: 'kai' })
         }}><RotateCcw size={16}/></button>}
@@ -439,12 +481,12 @@ function SettingsPanel() {
     </div>
     <div className="setting-card"><label className="cap">模板</label><b>A4 雙桌牌（實測）</b><div className="chips"><span>A4 直式</span><span>2 位 / 頁</span><span>上倒下正</span></div><small>橫線：{GUIDE_MM.join(' / ')} mm</small></div>
     <div className="setting-card"><label className="cap">文字</label>
-      <label className="field"><span>填滿程度 <b>{Math.round(settings.fillRatio*100)}%</b></span><input type="range" min="70" max="94" value={Math.round(settings.fillRatio*100)} onChange={(e) => update({ fillRatio: +e.target.value/100 })}/></label>
-      <label className="field"><span>字重 {settings.fontPreset === 'kai' && <b>合成粗體</b>}</span><select value={settings.fontWeight} onChange={(e) => update({ fontWeight: +e.target.value as FontWeight })}><option value="400">400 Regular</option><option value="500">500 Medium</option><option value="600">600 Semibold</option><option value="700">700 Bold</option></select>{settings.fontPreset === 'kai' && <small className="field-note">標楷體會用瀏覽器合成粗體，再補極輕微筆畫加粗，讓 500 / 600 / 700 真正看得出差異。</small>}</label>
+      <label className="field"><span>文字大小 <b>{Math.round(settings.fillRatio*100)}%</b></span><input type="range" min="70" max="94" value={Math.round(settings.fillRatio*100)} onChange={(e) => update({ fillRatio: +e.target.value/100 })}/></label>
+      <label className="field"><span>字重 {settings.fontPreset === 'kai' && <b>合成粗體</b>}</span><select value={settings.fontWeight} onChange={(e) => update({ fontWeight: +e.target.value as FontWeight })}><option value="400">一般 · 400</option><option value="500">適中 · 500</option><option value="600">偏粗 · 600</option><option value="700">粗體 · 700</option></select>{settings.fontPreset === 'kai' && <small className="field-note">標楷體會用瀏覽器合成粗體，再補極輕微筆畫加粗，讓 500 / 600 / 700 真正看得出差異。</small>}</label>
       <div className="two"><label className="field"><span>左右留白 mm</span><input type="number" min="2" max="20" step=".5" value={settings.sidePaddingMm} onChange={(e)=>update({sidePaddingMm:+e.target.value||5})}/></label><label className="field"><span>行距 mm</span><input type="number" min="0" max="10" step=".2" value={settings.lineGapMm} onChange={(e)=>update({lineGapMm:+e.target.value||0})}/></label></div>
     </div>
     <div className="setting-card"><label className="cap">圖片（選用）</label><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e)=>choose(e.target.files?.[0])}/>
-      {!imageUrl ? <button className="upload" onClick={()=>fileRef.current?.click()}><Upload size={17}/>選擇圖片</button> : <div className="image-row"><div className="thumb"><img src={imageUrl} alt=""/></div><div><b>{imageName}</b><small>僅在本機處理</small></div><button className="icon" onClick={()=>{if(imageUrl.startsWith('blob:'))URL.revokeObjectURL(imageUrl);clear()}}><RotateCcw size={16}/></button></div>}
+      {!imageUrl ? <button className="upload" onClick={()=>fileRef.current?.click()}><Upload size={17}/>選擇圖片</button> : <div className="image-row"><div className="thumb"><img src={imageUrl} alt=""/></div><div><b>{imageName}</b><small>僅在本機處理</small></div><button className="icon" aria-label="清除圖片" onClick={()=>{if(imageUrl.startsWith('blob:'))URL.revokeObjectURL(imageUrl);clear()}}><RotateCcw size={16}/></button></div>}
       {imageUrl && <><label className="field"><span>圖片位置</span><select value={settings.imageSide} onChange={(e)=>update({imageSide:e.target.value as 'left'|'right'})}><option value="left">左側</option><option value="right">右側</option></select></label><label className="field"><span>圖片欄寬 <b>{settings.imageWidthMm} mm</b></span><input type="range" min="25" max="55" value={settings.imageWidthMm} onChange={(e)=>update({imageWidthMm:+e.target.value})}/></label></>}
     </div>
     <label className="check"><input type="checkbox" checked={settings.showGuides} onChange={(e)=>update({showGuides:e.target.checked})}/>顯示裁切 / 折線</label>
@@ -459,6 +501,9 @@ export default function App() {
   const settings = useStore((s) => s.settings)
   const customFontName = useStore((s) => s.customFontName)
   const uiTheme = useStore((s) => s.uiTheme)
+  const notice = useStore((s) => s.notice)
+  const undoNotice = useStore((s) => s.undoNotice)
+  const clearNotice = useStore((s) => s.clearNotice)
   const [mobileView, setMobileView] = useState<'edit' | 'preview' | 'settings'>(() =>
     useStore.getState().guests.length ? 'preview' : 'edit'
   )
@@ -532,14 +577,21 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(clearNotice, 5500)
+    return () => window.clearTimeout(timer)
+  }, [notice, clearNotice])
+
+  useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as InstallPrompt) }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
   return <div className="studio">
-    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 頭對頭桌牌 · React PWA</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="word" disabled={!guests.length || wordState === 'working'} onClick={exportWord} aria-label="匯出 Word" title="匯出 Word"><FileText size={17}/><span className="desktop-label">{wordState === 'working' ? '產生中…' : '匯出 Word'}</span><span className="mobile-label">{wordState === 'working' ? '處理中' : 'Word'}</span></button><button className="print" onClick={()=>window.print()} aria-label="列印或另存 PDF" title="列印 / PDF"><Printer size={17}/><span className="desktop-label">列印 / PDF</span><span className="mobile-label">列印</span></button></div></header>
+    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 桌牌 · 自動排版</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="word" disabled={!guests.length || wordState === 'working'} onClick={exportWord} aria-label="匯出 Word" title="匯出 Word"><FileText size={17}/><span className="desktop-label">{wordState === 'working' ? '產生中…' : '匯出 Word'}</span><span className="mobile-label">{wordState === 'working' ? '處理中' : 'Word'}</span></button><button className="print" disabled={!guests.length} onClick={()=>window.print()} aria-label="列印或另存 PDF" title="列印 / PDF"><Printer size={17}/><span className="desktop-label">列印 / PDF</span><span className="mobile-label">列印</span></button></div></header>
     <main className={`mobile-view-${mobileView}`}><LeftPanel/><section className="preview" ref={previewRef}><div className="preview-bar"><div><b>列印預覽</b><small>{guests.length} 位 · {Math.ceil(guests.length/2)} 頁</small></div><span>{Math.round(scale*100)}%</span></div><div className="canvas">{!pages.length?<div className="blank"><Sparkles size={26}/><h2>先放幾個名字進來</h2><p>批次貼上或逐張新增。字級、置中、正反面交給它處理。</p></div>:pages.map((pair,i)=><Page key={i} pair={pair} scale={scale}/>)}</div></section><SettingsPanel/></main>
+    {notice && <div className="action-toast" role="status"><span>{notice.message}</span>{notice.previousGuests && <button type="button" onClick={undoNotice}>復原</button>}</div>}
     {wordMessage && <div className={`word-toast ${wordState}`} role="status">{wordMessage}</div>}
     <nav className="mobile-nav" aria-label="主要功能">
       <button className={mobileView==='edit'?'active':''} onClick={()=>setMobileView('edit')}><List size={20}/><span>編輯</span></button>
