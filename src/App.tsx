@@ -8,7 +8,7 @@ import {
   SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Download, Eye, FileText, Github, GripVertical, List, Plus, Printer, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Download, Eye, FileText, Github, GripVertical, List, Maximize2, Plus, Printer, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { exportDeskCardsToWord, type WordGuest } from './exportDocx'
 
 type Guest = { id: string; lines: string[] }
@@ -380,7 +380,7 @@ function LeftPanel() {
   </aside>
 }
 
-function SettingsPanel() {
+function SettingsPanel({ onClose }: { onClose?: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const fontFileRef = useRef<HTMLInputElement>(null)
   const [fontError, setFontError] = useState('')
@@ -420,7 +420,8 @@ function SettingsPanel() {
     setImage(URL.createObjectURL(file), file.name)
   }
   return <aside className="right-panel">
-    <div className="setting-card theme-card"><label className="cap">外觀</label>
+    <div className="settings-sheet-head"><div><b>調整桌牌</b><small>預覽會即時更新</small></div><button type="button" className="icon" onClick={onClose} aria-label="關閉調整面板"><X size={18}/></button></div>
+    <div className="settings-utility"><label className="cap">外觀</label>
       <div className="appearance-control">
         {UI_THEMES.map((theme) => <button
           key={theme.id}
@@ -432,9 +433,8 @@ function SettingsPanel() {
           {theme.name}
         </button>)}
       </div>
-      <small>系統模式會跟著裝置切換；A4 列印內容永遠維持白底黑字。</small>
     </div>
-    <div className="setting-card font-card"><label className="cap">桌牌字型</label>
+    <div className="setting-card font-card"><label className="cap">字型</label>
       <div className="font-grid">
         {FONT_PRESETS.map((font) => <button
           key={font.id}
@@ -479,17 +479,16 @@ function SettingsPanel() {
       {fontError && <div className="font-error">{fontError}</div>}
       <small>標楷體會優先使用裝置內建字型；找不到時會 fallback。自訂字型只留在目前工作階段，不會上傳。</small>
     </div>
-    <div className="setting-card"><label className="cap">模板</label><b>A4 雙桌牌（實測）</b><div className="chips"><span>A4 直式</span><span>2 位 / 頁</span><span>上倒下正</span></div><small>橫線：{GUIDE_MM.join(' / ')} mm</small></div>
-    <div className="setting-card"><label className="cap">文字</label>
+    <div className="setting-card"><label className="cap">排版</label>
       <label className="field"><span>文字大小 <b>{Math.round(settings.fillRatio*100)}%</b></span><input type="range" min="70" max="94" value={Math.round(settings.fillRatio*100)} onChange={(e) => update({ fillRatio: +e.target.value/100 })}/></label>
       <label className="field"><span>字重 {settings.fontPreset === 'kai' && <b>合成粗體</b>}</span><select value={settings.fontWeight} onChange={(e) => update({ fontWeight: +e.target.value as FontWeight })}><option value="400">一般 · 400</option><option value="500">適中 · 500</option><option value="600">偏粗 · 600</option><option value="700">粗體 · 700</option></select>{settings.fontPreset === 'kai' && <small className="field-note">標楷體會用瀏覽器合成粗體，再補極輕微筆畫加粗，讓 500 / 600 / 700 真正看得出差異。</small>}</label>
       <div className="two"><label className="field"><span>左右留白 mm</span><input type="number" min="2" max="20" step=".5" value={settings.sidePaddingMm} onChange={(e)=>update({sidePaddingMm:+e.target.value||5})}/></label><label className="field"><span>行距 mm</span><input type="number" min="0" max="10" step=".2" value={settings.lineGapMm} onChange={(e)=>update({lineGapMm:+e.target.value||0})}/></label></div>
+      <label className="check"><input type="checkbox" checked={settings.showGuides} onChange={(e)=>update({showGuides:e.target.checked})}/>顯示裁切 / 折線</label>
     </div>
     <div className="setting-card"><label className="cap">圖片（選用）</label><input ref={fileRef} hidden type="file" accept="image/*" onChange={(e)=>choose(e.target.files?.[0])}/>
       {!imageUrl ? <button className="upload" onClick={()=>fileRef.current?.click()}><Upload size={17}/>選擇圖片</button> : <div className="image-row"><div className="thumb"><img src={imageUrl} alt=""/></div><div><b>{imageName}</b><small>僅在本機處理</small></div><button className="icon" aria-label="清除圖片" onClick={()=>{if(imageUrl.startsWith('blob:'))URL.revokeObjectURL(imageUrl);clear()}}><RotateCcw size={16}/></button></div>}
       {imageUrl && <><label className="field"><span>圖片位置</span><select value={settings.imageSide} onChange={(e)=>update({imageSide:e.target.value as 'left'|'right'})}><option value="left">左側</option><option value="right">右側</option></select></label><label className="field"><span>圖片欄寬 <b>{settings.imageWidthMm} mm</b></span><input type="range" min="25" max="55" value={settings.imageWidthMm} onChange={(e)=>update({imageWidthMm:+e.target.value})}/></label></>}
     </div>
-    <label className="check"><input type="checkbox" checked={settings.showGuides} onChange={(e)=>update({showGuides:e.target.checked})}/>顯示裁切 / 折線</label>
   </aside>
 }
 
@@ -504,10 +503,13 @@ export default function App() {
   const notice = useStore((s) => s.notice)
   const undoNotice = useStore((s) => s.undoNotice)
   const clearNotice = useStore((s) => s.clearNotice)
-  const [mobileView, setMobileView] = useState<'edit' | 'preview' | 'settings'>(() =>
+  const [mobileView, setMobileView] = useState<'edit' | 'preview'>(() =>
     useStore.getState().guests.length ? 'preview' : 'edit'
   )
-  const scale = useScale(previewRef, mobileView)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const fitScale = useScale(previewRef, mobileView)
+  const [manualScale, setManualScale] = useState<number | null>(null)
+  const scale = manualScale ?? fitScale
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null)
   const [wordState, setWordState] = useState<'idle' | 'working' | 'success' | 'error'>('idle')
   const [wordMessage, setWordMessage] = useState('')
@@ -582,6 +584,10 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [notice, clearNotice])
 
+  const zoomBy = (delta: number) => {
+    setManualScale((current) => Math.min(1.4, Math.max(.3, (current ?? fitScale) + delta)))
+  }
+
   useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as InstallPrompt) }
     window.addEventListener('beforeinstallprompt', handler)
@@ -589,14 +595,34 @@ export default function App() {
   }, [])
 
   return <div className="studio">
-    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 桌牌 · 自動排版</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="word" disabled={!guests.length || wordState === 'working'} onClick={exportWord} aria-label="匯出 Word" title="匯出 Word"><FileText size={17}/><span className="desktop-label">{wordState === 'working' ? '產生中…' : '匯出 Word'}</span><span className="mobile-label">{wordState === 'working' ? '處理中' : 'Word'}</span></button><button className="print" disabled={!guests.length} onClick={()=>window.print()} aria-label="列印或另存 PDF" title="列印 / PDF"><Printer size={17}/><span className="desktop-label">列印 / PDF</span><span className="mobile-label">列印</span></button></div></header>
-    <main className={`mobile-view-${mobileView}`}><LeftPanel/><section className="preview" ref={previewRef}><div className="preview-bar"><div><b>列印預覽</b><small>{guests.length} 位 · {Math.ceil(guests.length/2)} 頁</small></div><span>{Math.round(scale*100)}%</span></div><div className="canvas">{!pages.length?<div className="blank"><Sparkles size={26}/><h2>先放幾個名字進來</h2><p>批次貼上或逐張新增。字級、置中、正反面交給它處理。</p></div>:pages.map((pair,i)=><Page key={i} pair={pair} scale={scale}/>)}</div></section><SettingsPanel/></main>
+    <header><div className="brand"><span><Sparkles size={17}/></span><div><b>Desk Card Studio</b><small>A4 桌牌 · 自動排版</small></div></div><div className="actions"><a href="https://github.com/jush0147/desk-card-maker" target="_blank"><Github size={17}/>GitHub</a>{installPrompt&&<button onClick={async()=>{await installPrompt.prompt();await installPrompt.userChoice;setInstallPrompt(null)}}><Download size={17}/>安裝</button>}<button className="word header-output" disabled={!guests.length || wordState === 'working'} onClick={exportWord} aria-label="匯出 Word" title="匯出 Word"><FileText size={17}/><span>{wordState === 'working' ? '產生中…' : '匯出 Word'}</span></button><button className="print header-output" disabled={!guests.length} onClick={()=>window.print()} aria-label="列印或另存 PDF" title="列印 / PDF"><Printer size={17}/><span>列印 / PDF</span></button></div></header>
+    <main className={`mobile-view-${mobileView} ${settingsOpen ? 'settings-open' : ''}`}>
+      <LeftPanel/>
+      <section className="preview" ref={previewRef}>
+        <div className="preview-bar">
+          <div><b>列印預覽</b><small>{guests.length} 位 · {Math.ceil(guests.length/2)} 頁 · A4 / 2 位</small></div>
+          <div className="preview-tools">
+            <button type="button" onClick={()=>zoomBy(-.12)} aria-label="縮小預覽"><ZoomOut size={16}/></button>
+            <button type="button" className={manualScale===null?'active':''} onClick={()=>setManualScale(null)} aria-label="預覽適合畫面"><Maximize2 size={15}/><span>適合</span></button>
+            <button type="button" onClick={()=>zoomBy(.12)} aria-label="放大預覽"><ZoomIn size={16}/></button>
+            <span className="zoom-value">{Math.round(scale*100)}%</span>
+            <button type="button" className="adjust-button" onClick={()=>setSettingsOpen(true)} aria-label="調整桌牌"><SlidersHorizontal size={16}/><span>調整</span></button>
+          </div>
+        </div>
+        <div className="canvas">{!pages.length?<div className="blank"><Sparkles size={26}/><h2>先放幾個名字進來</h2><p>批次貼上或逐張新增。字級、置中、正反面交給它處理。</p></div>:pages.map((pair,i)=><Page key={i} pair={pair} scale={scale}/>)}</div>
+        <div className="mobile-output-bar" aria-label="輸出">
+          <button className="word" disabled={!guests.length || wordState==='working'} onClick={exportWord}><FileText size={18}/>{wordState==='working'?'產生中…':'Word'}</button>
+          <button className="print" disabled={!guests.length} onClick={()=>window.print()}><Printer size={18}/>列印 / PDF</button>
+        </div>
+      </section>
+      <button className="settings-scrim" type="button" aria-label="關閉調整面板" onClick={()=>setSettingsOpen(false)}/>
+      <SettingsPanel onClose={()=>setSettingsOpen(false)}/>
+    </main>
     {notice && <div className="action-toast" role="status"><span>{notice.message}</span>{notice.previousGuests && <button type="button" onClick={undoNotice}>復原</button>}</div>}
     {wordMessage && <div className={`word-toast ${wordState}`} role="status">{wordMessage}</div>}
     <nav className="mobile-nav" aria-label="主要功能">
-      <button className={mobileView==='edit'?'active':''} onClick={()=>setMobileView('edit')}><List size={20}/><span>編輯</span></button>
+      <button className={mobileView==='edit'?'active':''} onClick={()=>setMobileView('edit')}><List size={20}/><span>名單</span></button>
       <button className={mobileView==='preview'?'active':''} onClick={()=>setMobileView('preview')}><Eye size={20}/><span>預覽</span></button>
-      <button className={mobileView==='settings'?'active':''} onClick={()=>setMobileView('settings')}><SlidersHorizontal size={20}/><span>設定</span></button>
     </nav>
   </div>
 }
