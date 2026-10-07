@@ -494,6 +494,15 @@ function SettingsPanel({ onClose }: { onClose?: () => void }) {
 
 type InstallPrompt = Event & { prompt:()=>Promise<void>; userChoice:Promise<{outcome:string}> }
 
+function shouldOfferIosInstall() {
+  const ua = navigator.userAgent
+  const isIos = /iPad|iPhone|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const isSafari = /Safari/i.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua)
+  const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+  return isIos && isSafari && !standalone
+}
+
 export default function App() {
   const previewRef = useRef<HTMLDivElement>(null)
   const guests = useStore((s) => s.guests)
@@ -513,6 +522,7 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState<InstallPrompt | null>(null)
   const [wordState, setWordState] = useState<'idle' | 'working' | 'success' | 'error'>('idle')
   const [wordMessage, setWordMessage] = useState('')
+  const [showIosInstall, setShowIosInstall] = useState(false)
   const pages: Array<[Guest|undefined,Guest|undefined]> = []
   for(let i=0;i<guests.length;i+=2) pages.push([guests[i],guests[i+1]])
 
@@ -589,6 +599,19 @@ export default function App() {
   }
 
   useEffect(() => {
+    if (!shouldOfferIosInstall()) return
+    try {
+      const visits = Number(localStorage.getItem('desk-card-ios-visits') ?? '0') + 1
+      localStorage.setItem('desk-card-ios-visits', String(visits))
+      if (visits >= 3 && localStorage.getItem('desk-card-ios-install-dismissed') !== '1') {
+        setShowIosInstall(true)
+      }
+    } catch {
+      // Private browsing can deny storage. The app remains fully usable without install history.
+    }
+  }, [])
+
+  useEffect(() => {
     const handler = (e: Event) => { e.preventDefault(); setInstallPrompt(e as InstallPrompt) }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
@@ -620,6 +643,7 @@ export default function App() {
     </main>
     {notice && <div className="action-toast" role="status"><span>{notice.message}</span>{notice.previousGuests && <button type="button" onClick={undoNotice}>復原</button>}</div>}
     {wordMessage && <div className={`word-toast ${wordState}`} role="status">{wordMessage}</div>}
+    {showIosInstall && <div className="ios-install-hint" role="status"><div><b>加到 iPhone 主畫面</b><span>Safari「分享」→「加入主畫面」</span></div><button type="button" className="icon" aria-label="不再顯示安裝提示" onClick={()=>{setShowIosInstall(false);try{localStorage.setItem('desk-card-ios-install-dismissed','1')}catch{}}}><X size={17}/></button></div>}
     <nav className="mobile-nav" aria-label="主要功能">
       <button className={mobileView==='edit'?'active':''} onClick={()=>setMobileView('edit')}><List size={20}/><span>名單</span></button>
       <button className={mobileView==='preview'?'active':''} onClick={()=>setMobileView('preview')}><Eye size={20}/><span>預覽</span></button>
