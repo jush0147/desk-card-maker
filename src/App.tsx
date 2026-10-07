@@ -507,6 +507,7 @@ export default function App() {
   const previewRef = useRef<HTMLDivElement>(null)
   const guests = useStore((s) => s.guests)
   const settings = useStore((s) => s.settings)
+  const imageUrl = useStore((s) => s.imageUrl)
   const customFontName = useStore((s) => s.customFontName)
   const uiTheme = useStore((s) => s.uiTheme)
   const notice = useStore((s) => s.notice)
@@ -573,6 +574,11 @@ export default function App() {
         fontName: resolveWordFontName(settings.fontPreset, customFontName),
         bold: settings.fontWeight >= 600,
         showGuides: settings.showGuides,
+        image: imageUrl ? {
+          url: imageUrl,
+          side: settings.imageSide,
+          widthMm: settings.imageWidthMm,
+        } : undefined,
       })
 
       setWordState('success')
