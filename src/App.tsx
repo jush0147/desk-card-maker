@@ -361,9 +361,17 @@ function LeftPanel() {
     const a = guests.findIndex((g) => g.id === active.id), b = guests.findIndex((g) => g.id === over.id)
     if (a >= 0 && b >= 0) reorder(a, b)
   }
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (guests.length) return
+    const pastedBlocks = parseBlocks(e.clipboardData.getData('text'))
+    if (!pastedBlocks.length) return
+    e.preventDefault()
+    replace(pastedBlocks)
+    setRaw('')
+  }
   return <aside className="left-panel">
-    <details className="bulk"><summary>批次貼上 <small>空白行分隔下一位</small></summary><div className="bulk-body">
-      <textarea value={raw} rows={7} onChange={(e) => setRaw(e.target.value)} placeholder={'單位名稱\n姓名 職稱\n\n下一位\n姓名 職稱'} aria-label="批次貼上桌牌名單" />
+    <details className="bulk" open><summary>直接貼上名單 <small>空白行分隔下一位</small></summary><div className="bulk-body">
+      <textarea value={raw} rows={7} onChange={(e) => setRaw(e.target.value)} onPaste={handlePaste} placeholder={'單位名稱\n姓名 職稱\n\n下一位\n姓名 職稱'} aria-label="批次貼上桌牌名單" />
       <div className="bulk-actions"><span>{blocks.length} 位</span><button disabled={!blocks.length} onClick={() => { append(blocks); setRaw('') }}>追加</button><button className="dark" disabled={!blocks.length} onClick={() => { replace(blocks); setRaw('') }}>取代名單</button></div>
     </div></details>
     <div className="section-title"><div><b>桌牌名單</b><small>拖曳調整列印順序</small></div><button onClick={add}><Plus size={15}/>新增</button></div>
